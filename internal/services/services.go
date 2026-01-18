@@ -70,8 +70,12 @@ func (s *UserService) ListUsers(ctx context.Context, name string, sort string, p
 	// Build filter
 	filter := make(map[string]interface{})
 	if name != "" {
-		filter["name"] = bson.M{"$regex": regexp.QuoteMeta(name), "$options": "i"}
-		log.Printf("[ListUsers Service] Built filter with name regex: %v", filter["name"])
+		// Search in both name and fullName fields
+		filter["$or"] = []bson.M{
+			{"name": bson.M{"$regex": regexp.QuoteMeta(name), "$options": "i"}},
+			{"fullName": bson.M{"$regex": regexp.QuoteMeta(name), "$options": "i"}},
+		}
+		log.Printf("[ListUsers Service] Built filter with name regex for both name and fullName fields")
 	} else {
 		log.Println("[ListUsers Service] No name filter, using empty filter")
 	}
@@ -101,14 +105,20 @@ func (s *UserService) ListUsers(ctx context.Context, name string, sort string, p
 	// Convert to DTO
 	var userData []dto.UserData
 	for _, user := range users {
-		status := "Active"
+		status := "active"
 		if user.IsDelete == 1 {
-			status = "Inactive"
+			status = "inactive"
+		}
+
+		// Use name field if available, otherwise fall back to fullName field
+		name := user.Name
+		if name == "" && user.FullName != "" {
+			name = user.FullName
 		}
 
 		userData = append(userData, dto.UserData{
 			UserID: user.UserID,
-			Name:   user.Name,
+			Name:   name,
 			Status: status,
 		})
 	}
@@ -169,7 +179,11 @@ func (s *AstroService) ListAstros(ctx context.Context, name string, sort string,
 	// Build filter
 	filter := make(map[string]interface{})
 	if name != "" {
-		filter["name"] = bson.M{"$regex": regexp.QuoteMeta(name), "$options": "i"}
+		// Search in both name and fullName fields
+		filter["$or"] = []bson.M{
+			{"name": bson.M{"$regex": regexp.QuoteMeta(name), "$options": "i"}},
+			{"fullName": bson.M{"$regex": regexp.QuoteMeta(name), "$options": "i"}},
+		}
 	}
 
 	// Calculate pagination
@@ -190,19 +204,25 @@ func (s *AstroService) ListAstros(ctx context.Context, name string, sort string,
 	// Convert to DTO
 	var astroData []dto.AstroData
 	for _, astro := range astros {
-		status := "Active"
+		status := "active"
 		if astro.IsDelete == 1 {
-			status = "Inactive"
+			status = "inactive"
 		}
 
-		visible := "No"
+		visible := "hidden"
 		if astro.IsActive == 1 {
-			visible = "Yes"
+			visible = "visible"
+		}
+
+		// Use name field if available, otherwise fall back to fullName field
+		name := astro.Name
+		if name == "" && astro.FullName != "" {
+			name = astro.FullName
 		}
 
 		astroData = append(astroData, dto.AstroData{
 			AstroID: astro.AstroID,
-			Name:    astro.Name,
+			Name:    name,
 			Status:  status,
 			Visible: visible,
 		})
@@ -233,9 +253,11 @@ func (s *AstroService) ListAstros(ctx context.Context, name string, sort string,
 func (s *AstroService) UpdateAstroStatus(ctx context.Context, astroID string, status string) error {
 	var isDelete, isActive int
 	if status == "inactive" {
+		// When deactivating: set isDelete=1 and isActive=0 (status=inactive, visibility=hidden)
 		isDelete = 1
 		isActive = 0
 	} else {
+		// When activating: set isDelete=0 and isActive=1 (status=active, visibility=visible)
 		isDelete = 0
 		isActive = 1
 	}
@@ -249,6 +271,8 @@ func (s *AstroService) UpdateAstroStatus(ctx context.Context, astroID string, st
 }
 
 func (s *AstroService) ToggleVisibility(ctx context.Context, astroID string, visible bool) error {
+	// Only update isActive field (visibility)
+	// This allows toggling visibility independently of deactivation status
 	var isActive int
 	if visible {
 		isActive = 1
@@ -309,14 +333,36 @@ func (s *ComplaintService) ListUserServiceComplaints(ctx context.Context, servic
 		return nil, err
 	}
 
-	// Convert to DTO
+	// Convert to DTO with names
 	var complaintData []dto.ComplaintData
 	for _, complaint := range complaints {
+		// Fetch user name
+		userName := "Unknown"
+		if user, err := s.userRepo.FindByUserID(ctx, complaint.UserID); err == nil {
+			if user.Name != "" {
+				userName = user.Name
+			} else if user.FullName != "" {
+				userName = user.FullName
+			}
+		}
+
+		// Fetch astrologer name
+		astroName := "Unknown"
+		if astro, err := s.astroRepo.FindByAstroID(ctx, complaint.AstroID); err == nil {
+			if astro.Name != "" {
+				astroName = astro.Name
+			} else if astro.FullName != "" {
+				astroName = astro.FullName
+			}
+		}
+
 		complaintData = append(complaintData, dto.ComplaintData{
 			ServiceType: complaint.ServiceType,
 			OrderID:     complaint.OrderID,
 			AstroID:     complaint.AstroID,
+			AstroName:   astroName,
 			UserID:      complaint.UserID,
+			UserName:    userName,
 			CreatedOn:   complaint.CreatedOn.Format("2006-01-02 15:04:05"),
 			Status:      complaint.Status,
 			Comment:     complaint.Comment,
@@ -437,12 +483,6 @@ func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId st
 	}
 
 	if req.Action == "accept" {
-		// Check if userRefundMoney > 0
-		if req.UserRefundMoney <= 0 {
-			return nil, fmt.Errorf("userRefundMoney must be greater than 0 to accept complaint")
-		}
-
-		// Fetch service report by orderId (already fetched above)
 		// Check if status is "open"
 		if complaint.Status != "open" {
 			return nil, fmt.Errorf("complaint status is not open, cannot accept")
@@ -457,22 +497,23 @@ func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId st
 			return nil, fmt.Errorf("failed to update complaint status: %w", err)
 		}
 
-		// Update user: totalAmount += userRefundMoney
-		user, err := s.userRepo.FindByUserID(ctx, complaint.UserID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to find user: %w", err)
+		// Update user: totalAmount += userRefundMoney (only if userRefundMoney > 0)
+		if req.UserRefundMoney > 0 {
+			user, err := s.userRepo.FindByUserID(ctx, complaint.UserID)
+			if err != nil {
+				return nil, fmt.Errorf("failed to find user: %w", err)
+			}
+
+			err = s.userRepo.UpdateByUserID(ctx, complaint.UserID, map[string]interface{}{
+				"totalAmount": user.TotalAmount + req.UserRefundMoney,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("failed to update user totalAmount: %w", err)
+			}
 		}
 
-		err = s.userRepo.UpdateByUserID(ctx, complaint.UserID, map[string]interface{}{
-			"totalAmount": user.TotalAmount + req.UserRefundMoney,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to update user totalAmount: %w", err)
-		}
-
-		// If both userRefundMoney > 0 AND astroRefundMoney > 0, also update astrologer
-		if req.UserRefundMoney > 0 && req.AstroRefundMoney > 0 {
-			// Update astrologer: totalEarned += astroRefundMoney
+		// Update astrologer: totalEarned += astroRefundMoney (only if astroRefundMoney > 0)
+		if req.AstroRefundMoney > 0 {
 			astro, err := s.astroRepo.FindByAstroID(ctx, complaint.AstroID)
 			if err != nil {
 				return nil, fmt.Errorf("failed to find astrologer: %w", err)
@@ -484,21 +525,11 @@ func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId st
 			if err != nil {
 				return nil, fmt.Errorf("failed to update astrologer totalEarned: %w", err)
 			}
-
-			return &dto.AcceptRejectResponse{
-				Success:        true,
-				Message:        "Complaint accepted, refund issued to user",
-				ComplaintID:    complaint.OrderID,
-				UserID:         complaint.UserID,
-				AstroID:        complaint.AstroID,
-				RefundedAmount: req.UserRefundMoney,
-			}, nil
 		}
 
-		// Only userRefundMoney > 0
 		return &dto.AcceptRejectResponse{
 			Success:        true,
-			Message:        "Complaint accepted, refund issued to user",
+			Message:        "Complaint accepted successfully",
 			ComplaintID:    complaint.OrderID,
 			UserID:         complaint.UserID,
 			AstroID:        complaint.AstroID,

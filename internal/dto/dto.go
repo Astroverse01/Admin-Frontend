@@ -54,7 +54,9 @@ type ComplaintData struct {
 	ServiceType string `json:"serviceType"`
 	OrderID     string `json:"orderId"`
 	AstroID     string `json:"astroId"`
+	AstroName   string `json:"astroName"`
 	UserID      string `json:"userId"`
+	UserName    string `json:"userName"`
 	CreatedOn   string `json:"createdOn"`
 	Status      string `json:"status"`
 	Comment     string `json:"comment"`
@@ -194,6 +196,12 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+// SuccessResponse represents success response
+type SuccessResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+}
+
 // StatusUpdateRequest represents status update request
 type StatusUpdateRequest struct {
 	Status string `json:"status" validate:"required,oneof=active inactive"`
@@ -201,7 +209,7 @@ type StatusUpdateRequest struct {
 
 // VisibilityUpdateRequest represents visibility update request
 type VisibilityUpdateRequest struct {
-	Visible bool `json:"visible" validate:"required"`
+	Visible bool `json:"visible"`
 }
 
 // StatusUpdateResponse represents status update response
@@ -209,4 +217,24 @@ type StatusUpdateResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 	ID      string `json:"id"`
+}
+
+// GenerateReportRequest represents date range request for report generation
+type GenerateReportRequest struct {
+	StartDate string `json:"startDate" validate:"required"`
+	EndDate   string `json:"endDate" validate:"required"`
+}
+
+// CSVFileInfo represents information about a generated CSV file
+type CSVFileInfo struct {
+	Collection string `json:"collection"`
+	FileName   string `json:"fileName"`
+	RecordCount int   `json:"recordCount"`
+}
+
+// GenerateReportResponse represents report generation response
+type GenerateReportResponse struct {
+	Success bool          `json:"success"`
+	Message string        `json:"message"`
+	Files   []CSVFileInfo `json:"files"`
 }

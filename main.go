@@ -11,6 +11,7 @@ import (
 	"astro-admin/internal/repository"
 	"astro-admin/internal/services"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -62,9 +63,37 @@ func main() {
 	userProblemHandler := handlers.NewUserProblemHandler(userProblemService)
 	astroProblemHandler := handlers.NewAstroProblemHandler(astroProblemService)
 	horoscopeHandler := handlers.NewHoroscopeHandler(horoscopeService, cfg.AdminID)
+	schedulerHandler := handlers.NewSchedulerHandler(schedulerService)
 
 	// Setup router
 	router := gin.Default()
+
+	// Add CORS middleware with proper configuration
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowOrigins = []string{
+		"http://localhost:3000",
+		"http://localhost:5173",
+		"http://127.0.0.1:3000",
+		"http://127.0.0.1:5173",
+	}
+	corsConfig.AllowCredentials = true
+	corsConfig.AllowHeaders = []string{
+		"Origin",
+		"Content-Type",
+		"Content-Length",
+		"Accept-Encoding",
+		"X-CSRF-Token",
+		"Authorization",
+		"accept",
+		"origin",
+		"Cache-Control",
+		"X-Requested-With",
+	}
+	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
+	corsConfig.ExposeHeaders = []string{"Content-Length"}
+	corsConfig.MaxAge = 12 * 3600
+
+	router.Use(cors.New(corsConfig))
 
 	// Public routes
 	router.POST("/admin/login", authHandler.Login)
@@ -100,6 +129,11 @@ func main() {
 		admin.POST("/horoscopes/bulk", horoscopeHandler.BulkCreateHoroscopes)
 		admin.PATCH("/horoscopes/:horoscopeId", horoscopeHandler.UpdateHoroscope)
 		admin.DELETE("/horoscopes/:horoscopeId", horoscopeHandler.DeleteHoroscope)
+
+		// Scheduler management
+		admin.POST("/scheduler/trigger", schedulerHandler.TriggerManually)
+		admin.POST("/scheduler/generate", schedulerHandler.GenerateReports)
+		admin.GET("/scheduler/download/:fileName", schedulerHandler.DownloadReport)
 	}
 
 	// Start daily report scheduler

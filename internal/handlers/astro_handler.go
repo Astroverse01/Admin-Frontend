@@ -116,15 +116,7 @@ func (h *AstroHandler) ToggleVisibility(c *gin.Context) {
 		return
 	}
 
-	// Validate request
-	validate := validator.New()
-	if err := validate.Struct(req); err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Success: false,
-			Message: "Validation failed: " + err.Error(),
-		})
-		return
-	}
+	// No validation needed for boolean field - it can only be true or false
 
 	// Call service
 	err := h.astroService.ToggleVisibility(c.Request.Context(), astroID, req.Visible)

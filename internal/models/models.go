@@ -10,7 +10,8 @@ import (
 type User struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	UserID      string             `bson:"userId" json:"userId"`
-	Name        string             `bson:"name" json:"name"`
+	Name        string             `bson:"name,omitempty" json:"name"`
+	FullName    string             `bson:"fullName,omitempty" json:"-"`
 	Email       string             `bson:"email" json:"email"`
 	IsDelete    int                `bson:"isDelete" json:"isDelete"`
 	TotalAmount float64            `bson:"totalAmount" json:"totalAmount"`
@@ -24,7 +25,8 @@ type User struct {
 type Astrologer struct {
 	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	AstroID     string             `bson:"astroId" json:"astroId"`
-	Name        string             `bson:"name" json:"name"`
+	Name        string             `bson:"name,omitempty" json:"name"`
+	FullName    string             `bson:"fullName,omitempty" json:"-"`
 	Email       string             `bson:"email" json:"email"`
 	IsDelete    int                `bson:"isDelete" json:"isDelete"`
 	IsActive    int                `bson:"isActive" json:"isActive"`

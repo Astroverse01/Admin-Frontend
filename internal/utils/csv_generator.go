@@ -13,9 +13,23 @@ import (
 
 // GenerateCSV creates a CSV file from MongoDB records (bson.M)
 func GenerateCSV(records []bson.M, collectionName string, outputDir string) (string, error) {
+	return GenerateCSVWithDateRange(records, collectionName, outputDir, time.Now(), time.Now())
+}
+
+// GenerateCSVWithDateRange creates a CSV file with specific date range in filename
+func GenerateCSVWithDateRange(records []bson.M, collectionName string, outputDir string, startDate, endDate time.Time) (string, error) {
+	// Generate filename based on date range
+	var fileName string
+	if startDate.Format("2006-01-02") == endDate.Format("2006-01-02") {
+		// Same date
+		fileName = fmt.Sprintf("%s_%s.csv", collectionName, startDate.Format("2006-01-02"))
+	} else {
+		// Date range
+		fileName = fmt.Sprintf("%s_%s_to_%s.csv", collectionName, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	}
+	
 	if len(records) == 0 {
 		// Create an empty CSV file even if there are no records
-		fileName := fmt.Sprintf("%s_%s.csv", collectionName, time.Now().Format("2006-01-02"))
 		filePath := filepath.Join(outputDir, fileName)
 		
 		file, err := os.Create(filePath)
@@ -50,8 +64,7 @@ func GenerateCSV(records []bson.M, collectionName string, outputDir string) (str
 	}
 	sort.Strings(keys)
 
-	// Create CSV file
-	fileName := fmt.Sprintf("%s_%s.csv", collectionName, time.Now().Format("2006-01-02"))
+	// Create CSV file (fileName already generated above)
 	filePath := filepath.Join(outputDir, fileName)
 
 	file, err := os.Create(filePath)
