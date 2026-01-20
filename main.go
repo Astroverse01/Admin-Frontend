@@ -4,12 +4,12 @@ import (
 	"log"
 	"os"
 
-	"astro-admin/internal/config"
-	"astro-admin/internal/database"
-	"astro-admin/internal/handlers"
-	"astro-admin/internal/middleware"
-	"astro-admin/internal/repository"
-	"astro-admin/internal/services"
+	"admin-be/internal/config"
+	"admin-be/internal/database"
+	"admin-be/internal/handlers"
+	"admin-be/internal/middleware"
+	"admin-be/internal/repository"
+	"admin-be/internal/services"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"

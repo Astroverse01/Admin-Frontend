@@ -18,7 +18,7 @@ docs/
 Thumbs.db
 
 # Build artifacts
-astro-admin
+admin-be
 *.exe
 *.dll
 *.so

@@ -1,8 +1,8 @@
 package repository
 
 import (
-	"astro-admin/internal/database"
-	"astro-admin/internal/models"
+	"admin-be/internal/database"
+	"admin-be/internal/models"
 	"context"
 	"log"
 	"regexp"

@@ -17,7 +17,7 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o astro-admin ./main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o admin-be ./main.go
 
 # Final stage
 FROM alpine:latest
@@ -31,7 +31,7 @@ ENV TZ=UTC
 WORKDIR /root/
 
 # Copy the binary from builder
-COPY --from=builder /app/astro-admin .
+COPY --from=builder /app/admin-be .
 
 # Expose port
 EXPOSE 8080
@@ -41,5 +41,5 @@ ENV PORT=8080
 ENV GIN_MODE=release
 
 # Run the application
-CMD ["./astro-admin"]
+CMD ["./admin-be"]
 

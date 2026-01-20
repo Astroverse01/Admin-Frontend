@@ -1,10 +1,10 @@
 package services
 
 import (
-	"astro-admin/internal/database"
-	"astro-admin/internal/dto"
-	"astro-admin/internal/models"
-	"astro-admin/internal/repository"
+	"admin-be/internal/database"
+	"admin-be/internal/dto"
+	"admin-be/internal/models"
+	"admin-be/internal/repository"
 	"context"
 	"errors"
 	"fmt"

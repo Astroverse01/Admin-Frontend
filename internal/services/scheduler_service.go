@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"astro-admin/internal/config"
-	"astro-admin/internal/repository"
-	"astro-admin/internal/utils"
+	"admin-be/internal/config"
+	"admin-be/internal/repository"
+	"admin-be/internal/utils"
 
 	"github.com/robfig/cron/v3"
 )

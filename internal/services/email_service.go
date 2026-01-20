@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"astro-admin/internal/config"
+	"admin-be/internal/config"
 )
 
 type EmailService struct {

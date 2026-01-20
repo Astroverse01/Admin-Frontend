@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"astro-admin/internal/models"
+	"admin-be/internal/models"
 	"context"
 )
 

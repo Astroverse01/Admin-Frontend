@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"astro-admin/internal/database"
+	"admin-be/internal/database"
 	"context"
 	"time"
 

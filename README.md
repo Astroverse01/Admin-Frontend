@@ -1,4 +1,4 @@
-# Astro Admin
+# Admin Backend
 
 A comprehensive admin panel for managing the Astroway platform, built with Go and Gin framework.
 
@@ -35,7 +35,7 @@ A comprehensive admin panel for managing the Astroway platform, built with Go an
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd Astro-Admin
+cd ADMIN-BE
 ```
 
 2. Install dependencies:
@@ -164,7 +164,7 @@ Records are filtered based on the `createdOn` field using UTC timezone. The form
 ## Project Structure
 
 ```
-Astro-Admin/
+ADMIN-BE/
 ├── main.go                    # Application entry point
 ├── go.mod                     # Go module definition
 ├── go.sum                     # Go module checksums
@@ -198,8 +198,8 @@ docker-compose up -d
 Or build and run with Docker:
 
 ```bash
-docker build -t astro-admin .
-docker run -p 8082:8082 --env-file .env astro-admin
+docker build -t admin-be .
+docker run -p 8082:8082 --env-file .env admin-be
 ```
 
 ## Development
@@ -213,8 +213,8 @@ go run main.go
 ### Building for Production
 
 ```bash
-go build -o astro-admin main.go
-./astro-admin
+go build -o admin-be main.go
+./admin-be
 ```
 
 ## Error Handling

@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"astro-admin/internal/dto"
-	"astro-admin/internal/services"
+	"admin-be/internal/dto"
+	"admin-be/internal/services"
 	"context"
 	"log"
 	"net/http"
