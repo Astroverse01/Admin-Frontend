@@ -30,4 +30,4 @@ jobs:
           docker system prune -af
           docker volume prune -f
           docker build --no-cache --build-arg SSH_PRIVATE_KEY="$(cat ../../.ssh/id_rsa)" -t admin-panel-image .
-          docker run -d -p 8082:8082 --name admin-panel-container --entrypoint /bin/sh admin-panel-image -c "bash server.sh"
+          docker run -d -p 8082:8082 --name admin-panel-container --env-file .env admin-panel-image
