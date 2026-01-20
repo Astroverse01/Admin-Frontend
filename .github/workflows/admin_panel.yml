@@ -1,0 +1,33 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - Admin_Panel
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: SSH into EC2 and Deploy
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd /home/ubuntu/Astroway/Admin-Backend
+          git pull --no-rebase origin Admin_Panel
+          docker stop admin-panel-container || true
+          docker rm admin-panel-container || true
+          docker rmi admin-panel-image || true
+          docker system df
+          docker system prune -af
+          docker volume prune -f
+          docker build --no-cache --build-arg SSH_PRIVATE_KEY="$(cat ../../.ssh/id_rsa)" -t admin-panel-image .
+          docker run -d -p 8082:8082 --name admin-panel-container --entrypoint /bin/sh admin-panel-image -c "bash server.sh"
