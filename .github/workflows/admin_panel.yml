@@ -14,6 +14,25 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v3
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/admin-panel:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
     - name: SSH into EC2 and Deploy
       uses: appleboy/ssh-action@master
       with:
@@ -22,12 +41,19 @@ jobs:
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
           cd /home/ubuntu/Astroway/Admin-Backend
-          git pull --no-rebase origin Admin_Panel
+          
+          # Log in to Docker Hub
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+          
+          # Stop and remove old container
           docker stop admin-panel-container || true
           docker rm admin-panel-container || true
-          docker rmi admin-panel-image || true
-          docker system df
-          docker system prune -af
-          docker volume prune -f
-          docker build --no-cache --build-arg SSH_PRIVATE_KEY="$(cat ../../.ssh/id_rsa)" -t admin-panel-image .
-          docker run -d -p 8082:8082 --name admin-panel-container --env-file .env admin-panel-image
+          
+          # Pull the latest image
+          docker pull ${{ secrets.DOCKER_USERNAME }}/admin-panel:latest
+          
+          # Clean up old images (not the latest)
+          docker image prune -af --filter "until=24h"
+          
+          # Run the new container
+          docker run -d -p 8082:8080 --name admin-panel-container --env-file .env --restart unless-stopped ${{ secrets.DOCKER_USERNAME }}/admin-panel:latest
