@@ -8,7 +8,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/admin': {
-        target: 'http://localhost:8082',
+        target: 'https://api-admin.astrosway.com',
         changeOrigin: true,
       },
     },
