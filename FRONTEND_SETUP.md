@@ -90,10 +90,10 @@ All APIs from `main.go` are integrated:
 The API base URL can be configured via environment variable:
 
 ```env
-VITE_API_URL=http://localhost:8082
+VITE_API_URL=https://admin-panel-fe.astrosway.com
 ```
 
-If not set, it defaults to `http://localhost:8082`.
+If not set, it defaults to `https://admin-panel-fe.astrosway.com`.
 
 ## Build for Production
 

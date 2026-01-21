@@ -32,9 +32,9 @@ cd frontend
 npm install
 ```
 
-3. Create a `.env` file (optional, defaults to `http://localhost:8082`):
+3. Create a `.env` file (optional, defaults to `https://admin-panel-fe.astrosway.com`):
 ```env
-VITE_API_URL=http://localhost:8082
+VITE_API_URL=https://admin-panel-fe.astrosway.com
 ```
 
 4. Start the development server:
