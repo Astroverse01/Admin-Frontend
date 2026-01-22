@@ -68,6 +68,7 @@ func main() {
 		"http://localhost:5173",
 		"http://127.0.0.1:3000",
 		"http://127.0.0.1:5173",
+		"https://effortless-melba-aa930b.netlify.app/"
 	}
 	corsConfig.AllowCredentials = true
 	corsConfig.AllowHeaders = []string{
