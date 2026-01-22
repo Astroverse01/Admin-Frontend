@@ -1,5 +1,6 @@
 package main
 
+import "strings"
 import (
 	"log"
 	"os"
@@ -63,12 +64,9 @@ func main() {
 
 	// Add CORS middleware with proper configuration
 	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowOrigins = []string{
-		"http://localhost:3000",
-		"http://localhost:5173",
-		"http://127.0.0.1:3000",
-		"http://127.0.0.1:5173",
-		"https://effortless-melba-aa930b.netlify.app/",
+	corsConfig.AllowOriginFunc = func(origin string) bool {
+		return strings.HasSuffix(origin, "astrosway.com") ||
+			origin == "https://effortless-melba-aa930b.netlify.app"
 	}
 	corsConfig.AllowCredentials = true
 	corsConfig.AllowHeaders = []string{
