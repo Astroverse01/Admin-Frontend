@@ -65,22 +65,24 @@ func main() {
 	// Add CORS middleware with proper configuration
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowOriginFunc = func(origin string) bool {
-		return strings.HasSuffix(origin, "astrosway.com") ||
-			origin == "https://effortless-melba-aa930b.netlify.app"
+		return true // ✅ allow all origins
 	}
 	corsConfig.AllowCredentials = true
 	corsConfig.AllowHeaders = []string{
-		"Origin",
-		"Content-Type",
-		"Content-Length",
-		"Accept-Encoding",
-		"X-CSRF-Token",
-		"Authorization",
-		"accept",
-		"origin",
-		"Cache-Control",
-		"X-Requested-With",
+		"*",
 	}
+	// corsConfig.AllowHeaders = []string{
+	// 	"Origin",
+	// 	"Content-Type",
+	// 	"Content-Length",
+	// 	"Accept-Encoding",
+	// 	"X-CSRF-Token",
+	// 	"Authorization",
+	// 	"accept",
+	// 	"origin",
+	// 	"Cache-Control",
+	// 	"X-Requested-With",
+	// }
 	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"}
 	corsConfig.ExposeHeaders = []string{"Content-Length"}
 	corsConfig.MaxAge = 12 * 3600
