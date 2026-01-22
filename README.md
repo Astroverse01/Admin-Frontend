@@ -11,14 +11,12 @@ A comprehensive admin panel for managing the Astroway platform, built with Go an
 - **Daily Report Scheduler**: Automated daily reports via email with CSV attachments
 - **JWT Authentication**: Secure admin authentication
 - **MongoDB Integration**: MongoDB database for data storage
-- **Redis Integration**: Redis for caching (optional)
 
 ## Tech Stack
 
 - **Language**: Go 1.21+
 - **Web Framework**: Gin
 - **Database**: MongoDB
-- **Cache**: Redis (optional)
 - **Authentication**: JWT
 - **Scheduler**: Cron (robfig/cron/v3)
 - **Email**: SMTP (Gmail)
@@ -27,7 +25,6 @@ A comprehensive admin panel for managing the Astroway platform, built with Go an
 
 - Go 1.21 or higher
 - MongoDB instance
-- Redis (optional, for caching)
 - Gmail account with App Password (for daily reports)
 
 ## Installation
@@ -64,7 +61,6 @@ Create a `.env` file in the root directory with the following variables:
 ```env
 # Database Configuration
 MONGO_URI=your_mongodb_connection_string
-REDIS_URL=localhost:6379
 
 # JWT Configuration
 JWT_SECRET=your_jwt_secret_key
@@ -173,7 +169,7 @@ ADMIN-BE/
 ├── env.example                # Environment variables example
 ├── internal/
 │   ├── config/                # Configuration management
-│   ├── database/              # Database connections (MongoDB, Redis)
+│   ├── database/              # Database connections (MongoDB)
 │   ├── dto/                   # Data Transfer Objects
 │   ├── handlers/              # HTTP handlers
 │   ├── middleware/            # HTTP middleware (auth, etc.)

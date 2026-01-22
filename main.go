@@ -27,13 +27,6 @@ func main() {
 
 	// Initialize database connections
 	mongoDB := database.NewMongoDB(cfg.MongoURI)
-	redisDB, err := database.NewRedis(cfg.RedisURL)
-	if err != nil {
-		log.Printf("Warning: Redis connection failed: %v. Continuing without Redis...", err)
-		redisDB = nil
-	} else {
-		log.Println("Redis connected successfully")
-	}
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(mongoDB)
@@ -49,9 +42,9 @@ func main() {
 	userService := services.NewUserService(userRepo)
 	astroService := services.NewAstroService(astroRepo)
 	emailService := services.NewEmailService(cfg)
-	complaintService := services.NewComplaintService(serviceReportRepo, userRepo, astroRepo, mongoDB, redisDB, emailService)
-	userProblemService := services.NewUserProblemService(userProblemRepo, userRepo, redisDB)
-	astroProblemService := services.NewAstroProblemService(astroProblemRepo, astroRepo, redisDB)
+	complaintService := services.NewComplaintService(serviceReportRepo, userRepo, astroRepo, mongoDB, emailService)
+	userProblemService := services.NewUserProblemService(userProblemRepo, userRepo)
+	astroProblemService := services.NewAstroProblemService(astroProblemRepo, astroRepo)
 	horoscopeService := services.NewHoroscopeService(horoscopeRepo)
 	schedulerService := services.NewSchedulerService(dailyReportRepo, emailService, cfg)
 

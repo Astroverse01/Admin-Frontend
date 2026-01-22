@@ -21,23 +21,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis service (optional)
-  redis:
-    image: redis:7-alpine
-    container_name: admin-be-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - admin-be-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   # Application service
   app:
     build:
@@ -50,21 +33,16 @@ services:
     environment:
       PORT: 8080
       MONGO_URI: mongodb://admin:password@mongodb:27017/?authSource=admin
-      REDIS_URL: redis:6379
       JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
       GIN_MODE: release
     depends_on:
       mongodb:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     networks:
       - admin-be-network
 
 volumes:
   mongodb_data:
-    driver: local
-  redis_data:
     driver: local
 
 networks:

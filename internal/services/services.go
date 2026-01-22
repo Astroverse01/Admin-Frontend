@@ -294,17 +294,15 @@ type ComplaintService struct {
 	astroRepo         repository.AstroRepository
 	serviceRepo       repository.ServiceRepository
 	emailService      *EmailService
-	redisDB           *database.Redis
 }
 
-func NewComplaintService(serviceReportRepo repository.ServiceReportRepository, userRepo repository.UserRepository, astroRepo repository.AstroRepository, mongoDB *database.MongoDB, redisDB *database.Redis, emailService *EmailService) *ComplaintService {
+func NewComplaintService(serviceReportRepo repository.ServiceReportRepository, userRepo repository.UserRepository, astroRepo repository.AstroRepository, mongoDB *database.MongoDB, emailService *EmailService) *ComplaintService {
 	return &ComplaintService{
 		serviceReportRepo: serviceReportRepo,
 		userRepo:          userRepo,
 		astroRepo:         astroRepo,
 		serviceRepo:       repository.NewServiceRepository(mongoDB),
 		emailService:      emailService,
-		redisDB:           redisDB,
 	}
 }
 
@@ -587,14 +585,12 @@ func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId st
 type UserProblemService struct {
 	userProblemRepo repository.UserProblemRepository
 	userRepo        repository.UserRepository
-	redisDB         *database.Redis
 }
 
-func NewUserProblemService(userProblemRepo repository.UserProblemRepository, userRepo repository.UserRepository, redisDB *database.Redis) *UserProblemService {
+func NewUserProblemService(userProblemRepo repository.UserProblemRepository, userRepo repository.UserRepository) *UserProblemService {
 	return &UserProblemService{
 		userProblemRepo: userProblemRepo,
 		userRepo:        userRepo,
-		redisDB:         redisDB,
 	}
 }
 
@@ -684,14 +680,12 @@ func (s *UserProblemService) CloseComplaint(ctx context.Context, problemID strin
 type AstroProblemService struct {
 	astroProblemRepo repository.AstroProblemRepository
 	astroRepo        repository.AstroRepository
-	redisDB          *database.Redis
 }
 
-func NewAstroProblemService(astroProblemRepo repository.AstroProblemRepository, astroRepo repository.AstroRepository, redisDB *database.Redis) *AstroProblemService {
+func NewAstroProblemService(astroProblemRepo repository.AstroProblemRepository, astroRepo repository.AstroRepository) *AstroProblemService {
 	return &AstroProblemService{
 		astroProblemRepo: astroProblemRepo,
 		astroRepo:        astroRepo,
-		redisDB:          redisDB,
 	}
 }
 
