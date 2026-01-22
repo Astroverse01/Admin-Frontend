@@ -56,4 +56,4 @@ jobs:
           docker image prune -af --filter "until=24h"
           
           # Run the new container
-          docker run -d -p 8082:8080 --name admin-panel-container --env-file .env --restart unless-stopped ${{ secrets.DOCKER_USERNAME }}/admin-panel:latest
+          docker run -d -p 8082:8082 --name admin-panel-container --env-file .env --restart unless-stopped ${{ secrets.DOCKER_USERNAME }}/admin-panel:latest
