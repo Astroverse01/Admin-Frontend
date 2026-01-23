@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { complaintsAPI } from '../services/api';
-import { ChevronLeft, ChevronRight, Check, X, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, X, RefreshCw, ExternalLink, Play } from 'lucide-react';
 import { format } from 'date-fns';
 
 const UserServiceComplaints = () => {
@@ -11,6 +11,9 @@ const UserServiceComplaints = () => {
   const [actionLoading, setActionLoading] = useState(null);
   const [refundAmounts, setRefundAmounts] = useState({});
   const [refreshing, setRefreshing] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [complaintDetails, setComplaintDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   const fetchComplaints = async () => {
     setLoading(true);
@@ -117,6 +120,37 @@ const UserServiceComplaints = () => {
       await fetchComplaints();
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  // Map service type from GET /admin/user-service-complaints response format
+  // to the format required by GET /admin/user-service-complaints/:serviceType/:orderId
+  // chat -> chat, call -> ivrCall, video -> videoCall
+  const mapServiceTypeToAPI = (serviceType) => {
+    if (!serviceType) return 'chat'; // default fallback
+    
+    const normalized = serviceType.toLowerCase();
+    const mapping = {
+      'chat': 'chat',      // chat stays as chat
+      'call': 'ivrCall',   // call maps to ivrCall for the API
+      'video': 'videoCall', // video maps to videoCall for the API
+    };
+    return mapping[normalized] || normalized;
+  };
+
+  const handleOrderIdClick = async (orderId, serviceType) => {
+    setDetailsLoading(true);
+    setShowDetailsModal(true);
+    try {
+      const apiServiceType = mapServiceTypeToAPI(serviceType);
+      const response = await complaintsAPI.getComplaintDetails(apiServiceType, orderId);
+      setComplaintDetails(response.data || response);
+    } catch (error) {
+      console.error('Error fetching complaint details:', error);
+      alert(error.response?.data?.message || 'Failed to fetch complaint details');
+      setShowDetailsModal(false);
+    } finally {
+      setDetailsLoading(false);
     }
   };
 
@@ -239,9 +273,13 @@ const UserServiceComplaints = () => {
                     return (
                       <tr key={complaint.orderId} className="hover:bg-gray-50">
                         <td className="px-4 py-4 text-sm text-gray-900">
-                          <div className="max-w-[150px] truncate" title={complaint.orderId}>
+                          <button
+                            onClick={() => handleOrderIdClick(complaint.orderId, complaint.serviceType)}
+                            className="max-w-[150px] truncate text-primary-600 hover:text-primary-800 hover:underline cursor-pointer"
+                            title={`Click to view details: ${complaint.orderId}`}
+                          >
                             {complaint.orderId}
-                          </div>
+                          </button>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                           {complaint.serviceType}
@@ -361,6 +399,176 @@ const UserServiceComplaints = () => {
           </>
         )}
       </div>
+
+      {/* Details Modal */}
+      {showDetailsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold text-gray-800">Complaint Details</h2>
+                <button
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    setComplaintDetails(null);
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {detailsLoading ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+                </div>
+              ) : complaintDetails ? (
+                <div className="space-y-4">
+                  {/* Basic Information */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Order ID</label>
+                      <p className="text-sm text-gray-900 break-all">{complaintDetails.ivrId || complaintDetails.chatId || complaintDetails.videoId || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">User ID</label>
+                      <p className="text-sm text-gray-900 break-all">{complaintDetails.userId || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Astrologer ID</label>
+                      <p className="text-sm text-gray-900 break-all">{complaintDetails.astroId || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <p className="text-sm text-gray-900">{complaintDetails.lastStatus || complaintDetails.status || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                      <p className="text-sm text-gray-900">{complaintDetails.type || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Category Type</label>
+                      <p className="text-sm text-gray-900">{complaintDetails.categoryType || 'N/A'}</p>
+                    </div>
+                    {complaintDetails.ratePerMintue && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Rate Per Minute</label>
+                        <p className="text-sm text-gray-900">₹{complaintDetails.ratePerMintue}</p>
+                      </div>
+                    )}
+                    {complaintDetails.paymentReceived !== undefined && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Payment Received</label>
+                        <p className="text-sm text-gray-900">{complaintDetails.paymentReceived ? 'Yes' : 'No'}</p>
+                      </div>
+                    )}
+                    {complaintDetails.createdOn && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Created On</label>
+                        <p className="text-sm text-gray-900">{format(new Date(complaintDetails.createdOn), 'MMM dd, yyyy HH:mm:ss')}</p>
+                      </div>
+                    )}
+                    {complaintDetails.updatedOn && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Updated On</label>
+                        <p className="text-sm text-gray-900">{format(new Date(complaintDetails.updatedOn), 'MMM dd, yyyy HH:mm:ss')}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* URL/Audio Link */}
+                  {complaintDetails.url && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Audio/Media URL</label>
+                      <a
+                        href={complaintDetails.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-primary-600 hover:text-primary-800 hover:underline break-all"
+                      >
+                        <Play className="w-4 h-4 flex-shrink-0" />
+                        <span className="break-all">{complaintDetails.url}</span>
+                        <ExternalLink className="w-4 h-4 flex-shrink-0" />
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Conversation */}
+                  {complaintDetails.conversation && complaintDetails.conversation.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Conversation</label>
+                      <div className="border border-gray-200 rounded-lg p-4 max-h-64 overflow-y-auto">
+                        {complaintDetails.conversation.map((msg, index) => (
+                          <div key={index} className="mb-3 last:mb-0">
+                            <div className="flex items-start gap-2">
+                              <span className={`text-xs font-semibold ${msg.isAstrolger ? 'text-blue-600' : 'text-green-600'}`}>
+                                {msg.isAstrolger ? 'Astrologer' : 'User'}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {msg.timestamp ? format(new Date(msg.timestamp), 'MMM dd, yyyy HH:mm:ss') : 'N/A'}
+                              </span>
+                            </div>
+                            {msg.message && (
+                              <div className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
+                                {msg.message.text || JSON.stringify(msg.message)}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Status History */}
+                  {complaintDetails.status && Array.isArray(complaintDetails.status) && complaintDetails.status.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Status History</label>
+                      <div className="border border-gray-200 rounded-lg p-4">
+                        {complaintDetails.status.map((statusItem, index) => (
+                          <div key={index} className="mb-2 last:mb-0">
+                            <span className="text-sm font-medium text-gray-900">{statusItem.type}</span>
+                            {statusItem.createdOn && (
+                              <span className="text-xs text-gray-500 ml-2">
+                                - {format(new Date(statusItem.createdOn), 'MMM dd, yyyy HH:mm:ss')}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Raw Data (for debugging) */}
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
+                      View Raw Data
+                    </summary>
+                    <pre className="mt-2 p-4 bg-gray-50 rounded-lg text-xs overflow-x-auto">
+                      {JSON.stringify(complaintDetails, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No details available</p>
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    setComplaintDetails(null);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
