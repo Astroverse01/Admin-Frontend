@@ -48,61 +48,22 @@ func NewSchedulerService(repo repository.DailyReportRepository, emailService *Em
 	}
 }
 
-// Start starts the cron scheduler
+// Start initializes the scheduler service (cron job removed - reports can be generated manually via API)
 func (s *SchedulerService) Start() error {
-	// Validate email configuration from .env before starting
-	if err := s.emailService.validateEmailConfig(); err != nil {
-		return fmt.Errorf("failed to start scheduler: %w", err)
-	}
-
 	// Ensure output directory exists
 	if err := utils.EnsureDir(s.outputDir); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	// Schedule cron job to run daily at 2:35 PM (14:35:00)
-	// Cron format (with seconds): second minute hour day month weekday
-	// "0 35 14 * * *" means 14:35:00 (2:35 PM) every day
-	// Note: Cron uses the server's local timezone
-	// When it runs at 2:35 PM, it will fetch data from the previous day (yesterday)
-	cronID, err := s.cron.AddFunc("0 35 14 * * *", func() {
-		now := time.Now()
-		log.Printf("[Scheduler] Daily report job triggered at %s (Local Time: %s)", now.Format(time.RFC3339), now.Format("2006-01-02 15:04:05 MST"))
-		if err := s.GenerateAndSendDailyReports(); err != nil {
-			log.Printf("[Scheduler] Error generating daily reports: %v", err)
-		} else {
-			log.Println("[Scheduler] Daily report generation completed successfully")
-		}
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to schedule cron job: %w", err)
-	}
-
-	s.cron.Start()
-
-	// Log timezone and next run information
-	now := time.Now()
-	nextRun := time.Date(now.Year(), now.Month(), now.Day(), 14, 35, 0, 0, now.Location())
-	if now.After(nextRun) || now.Equal(nextRun) {
-		// If it's already past 2:35 PM today, schedule for tomorrow
-		nextRun = nextRun.Add(24 * time.Hour)
-	}
-
-	log.Printf("[Scheduler] Daily report scheduler started successfully")
-	log.Printf("[Scheduler] Server timezone: %s", now.Location().String())
-	log.Printf("[Scheduler] Current server time: %s", now.Format("2006-01-02 15:04:05 MST"))
-	log.Printf("[Scheduler] Next scheduled run: %s (Cron ID: %d)", nextRun.Format("2006-01-02 15:04:05 MST"), cronID)
-	log.Printf("[Scheduler] Will run daily at 2:35 PM server local time")
-	log.Printf("[Scheduler] Note: When it runs, it will fetch data from the previous day (yesterday)")
+	log.Printf("[Scheduler] Scheduler service initialized successfully")
+	log.Printf("[Scheduler] Daily cron job has been removed - reports can be generated manually via API")
 
 	return nil
 }
 
-// Stop stops the cron scheduler
+// Stop stops the scheduler service (no-op since cron job has been removed)
 func (s *SchedulerService) Stop() {
-	s.cron.Stop()
-	log.Println("[Scheduler] Daily report scheduler stopped")
+	log.Println("[Scheduler] Scheduler service stopped")
 }
 
 // GenerateAndSendDailyReports fetches the previous day's records from all collections and sends them via email

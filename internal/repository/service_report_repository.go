@@ -4,6 +4,7 @@ import (
 	"admin-be/internal/database"
 	"admin-be/internal/models"
 	"context"
+	"fmt"
 	"log"
 	"regexp"
 	"time"
@@ -36,7 +37,7 @@ func (r *serviceReportRepository) FindAll(ctx context.Context, filter map[string
 		"userId":      1,
 		"status":      1,
 		"createdOn":   1,
-		"comment":    1,
+		"comment":     1,
 		"reportId":    1,
 	}
 
@@ -74,6 +75,8 @@ func (r *serviceReportRepository) FindByOrderIDAndServiceType(ctx context.Contex
 	// Use case-insensitive regex match for serviceType to handle case variations
 	// Escape special regex characters to prevent issues
 	escapedServiceType := regexp.QuoteMeta(serviceType)
+
+	// Filter: orderId matches exactly, serviceType matches case-insensitively
 	filter := bson.M{
 		"orderId": orderId,
 		"serviceType": bson.M{
@@ -81,12 +84,27 @@ func (r *serviceReportRepository) FindByOrderIDAndServiceType(ctx context.Contex
 			"$options": "i", // case-insensitive
 		},
 	}
-	
+
 	// Debug: Log the filter being used
 	log.Printf("[Repository] Searching with filter: orderId=%s, serviceType regex=^%s$ (case-insensitive)", orderId, escapedServiceType)
-	
+
 	err := r.collection.FindOne(ctx, filter).Decode(&report)
 	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			// Diagnostic: Check if record exists with this orderId at all (without serviceType filter)
+			var diagnosticReport bson.M
+			diagErr := r.collection.FindOne(ctx, bson.M{"orderId": orderId}).Decode(&diagnosticReport)
+
+			if diagErr == nil {
+				// Record exists but serviceType doesn't match
+				foundServiceType, _ := diagnosticReport["serviceType"].(string)
+				log.Printf("[Repository] Record exists with orderId %s, but serviceType doesn't match. Expected: '%s', Found in DB: '%s'", orderId, serviceType, foundServiceType)
+				return nil, fmt.Errorf("complaint found for orderId %s but serviceType mismatch (expected: %s, found in DB: %s)", orderId, serviceType, foundServiceType)
+			}
+
+			log.Printf("[Repository] No record found with orderId: %s", orderId)
+			return nil, err
+		}
 		log.Printf("[Repository] FindOne error: %v", err)
 		return nil, err
 	}
@@ -118,4 +136,3 @@ func (r *serviceReportRepository) UpdateByOrderID(ctx context.Context, orderId s
 func (r *serviceReportRepository) Count(ctx context.Context, filter map[string]interface{}) (int64, error) {
 	return r.collection.CountDocuments(ctx, filter)
 }
-

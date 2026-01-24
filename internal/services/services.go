@@ -387,27 +387,52 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 	serviceType = strings.TrimSpace(serviceType)
 	orderId = strings.TrimSpace(orderId)
 
-	// Normalize service type for consistent lookups (for switch statement)
-	normalizedServiceType := strings.ToLower(serviceType)
+	// Normalize serviceType to match collection names (camelCase for ivrCall and videoCall)
+	//serviceTypeLower := strings.ToLower(serviceType)
+
+	// Map to correct camelCase format based on collection names
+	switch serviceType {
+	case "ivrCall":
+		serviceType = "ivrCall" // Collection name is "ivrCall"
+	case "videoCall":
+		serviceType = "videoCall" // Collection name is "videoCall"
+	case "chat":
+		serviceType = "chat" // Collection name is "chat"
+	default:
+		// Preserve original if it doesn't match known patterns
+		// No assignment needed - serviceType already has its value
+	}
 
 	// First, verify that a complaint exists for this orderId and serviceType
 	// Repository now handles case-insensitive matching via regex
 	log.Printf("Searching for complaint with orderId: %s, serviceType: %s", orderId, serviceType)
 	complaint, err := s.serviceReportRepo.FindByOrderIDAndServiceType(ctx, orderId, serviceType)
 	if err != nil {
-		if errors.Is(err, mongo.ErrNoDocuments) {
-			log.Printf("No complaint found for orderId: %s, serviceType: %s", orderId, serviceType)
-			return nil, fmt.Errorf("complaint not found for orderId %s and serviceType %s", orderId, serviceType)
+		// Fallback: If searching for "ivrCall" fails, try "call" (legacy data might use "call")
+		if serviceType == "ivrCall" {
+			log.Printf("Initial search failed for 'ivrCall', trying fallback 'call'")
+			complaint, err = s.serviceReportRepo.FindByOrderIDAndServiceType(ctx, orderId, "ivrCall")
+			if err == nil {
+				log.Printf("Found complaint using fallback 'call', updating serviceType to 'ivrCall'")
+				serviceType = "ivrCall" // Keep the normalized serviceType for switch statement
+			}
 		}
-		log.Printf("Error finding complaint: %v", err)
-		return nil, fmt.Errorf("failed to find complaint: %w", err)
+
+		if err != nil {
+			if errors.Is(err, mongo.ErrNoDocuments) {
+				log.Printf("No complaint found for orderId: %s, serviceType: %s", orderId, serviceType)
+				return nil, fmt.Errorf("complaint not found for orderId %s and serviceType %s", orderId, serviceType)
+			}
+			log.Printf("Error finding complaint: %v", err)
+			return nil, fmt.Errorf("failed to find complaint: %w", err)
+		}
 	}
 	log.Printf("Complaint found: reportID=%s, orderID=%s, serviceType=%s", complaint.ReportID, complaint.OrderID, complaint.ServiceType)
 
 	var serviceData dto.ServiceData
 	reportID := complaint.ReportID
 
-	switch normalizedServiceType {
+	switch serviceType {
 	case "chat":
 		// orderId is a foreign key in serviceReports collection that references chatId in the chat collection
 		log.Printf("Looking up chat with chatId (orderId): %s", orderId)
@@ -429,13 +454,16 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 			Type:          "chat",
 			ReportID:      reportID,
 		}
-	case "ivrcall":
+	case "ivrCall":
 		ivr, err := s.serviceRepo.FindIvrByIvrID(ctx, orderId)
 		if err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
 				return nil, fmt.Errorf("IVR service not found for orderId %s", orderId)
 			}
 			return nil, fmt.Errorf("failed to find IVR service: %w", err)
+		}
+		if ivr.URL == "" {
+			return nil, fmt.Errorf("audio is not available for this orderId")
 		}
 		serviceData = dto.ServiceData{
 			ServiceID:     ivr.IvrID,
@@ -446,7 +474,7 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 			Type:          "ivr",
 			ReportID:      reportID,
 		}
-	case "videocall":
+	case "videoCall":
 		video, err := s.serviceRepo.FindVideoByVideoID(ctx, orderId)
 		if err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
@@ -619,12 +647,20 @@ func (s *UserProblemService) ListUserGeneralComplaints(ctx context.Context, prob
 		return nil, err
 	}
 
-	// Convert to DTO
+	// Convert to DTO and fetch user fullName
 	var problemData []dto.ProblemData
 	for _, problem := range problems {
+		fullName := ""
+		if problem.UserID != "" {
+			user, err := s.userRepo.FindByUserID(ctx, problem.UserID)
+			if err == nil && user != nil {
+				fullName = user.FullName
+			}
+		}
 		problemData = append(problemData, dto.ProblemData{
 			ProblemID:    problem.ProblemID,
 			UserID:       problem.UserID,
+			FullName:     fullName,
 			Status:       problem.Status,
 			Comment:      problem.Comment,
 			ProblemTypes: problem.ProblemTypes,
@@ -950,4 +986,76 @@ func (s *HoroscopeService) DeleteHoroscope(ctx context.Context, horoscopeID stri
 		Message:     "Horoscope deleted successfully",
 		HoroscopeID: horoscopeID,
 	}, nil
+}
+
+// DashboardService handles dashboard metrics logic
+type DashboardService struct {
+	serviceRepo repository.ServiceRepository
+}
+
+func NewDashboardService(serviceRepo repository.ServiceRepository) *DashboardService {
+	return &DashboardService{
+		serviceRepo: serviceRepo,
+	}
+}
+
+// GetDailyMetrics calculates daily metrics for chat, ivrCall, and videoCall grouped by lastStatus
+// date format: YYYY-MM-DD (e.g., "2024-01-15")
+func (s *DashboardService) GetDailyMetrics(ctx context.Context, date string) (*dto.DashboardMetricsResponse, error) {
+	// Parse date
+	targetDate, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return nil, fmt.Errorf("invalid date format: %w", err)
+	}
+
+	// Set time range for the entire day (00:00:00 to 23:59:59.999999999)
+	startTime := time.Date(targetDate.Year(), targetDate.Month(), targetDate.Day(), 0, 0, 0, 0, time.UTC)
+	endTime := startTime.Add(24 * time.Hour)
+
+	// Get metrics for each collection
+	chatMetrics, err := s.serviceRepo.CountByLastStatus(ctx, "chat", startTime, endTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get chat metrics: %w", err)
+	}
+
+	ivrCallMetrics, err := s.serviceRepo.CountByLastStatus(ctx, "ivrCall", startTime, endTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ivrCall metrics: %w", err)
+	}
+
+	videoCallMetrics, err := s.serviceRepo.CountByLastStatus(ctx, "videoCall", startTime, endTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get videoCall metrics: %w", err)
+	}
+
+	// Convert to ServiceMetrics DTO
+	chatServiceMetrics := s.convertToServiceMetrics(chatMetrics)
+	ivrCallServiceMetrics := s.convertToServiceMetrics(ivrCallMetrics)
+	videoCallServiceMetrics := s.convertToServiceMetrics(videoCallMetrics)
+
+	return &dto.DashboardMetricsResponse{
+		Success: true,
+		Data: dto.DashboardMetrics{
+			Date:      date,
+			Chat:      chatServiceMetrics,
+			IvrCall:   ivrCallServiceMetrics,
+			VideoCall: videoCallServiceMetrics,
+		},
+	}, nil
+}
+
+// convertToServiceMetrics converts map[string]int64 to ServiceMetrics
+func (s *DashboardService) convertToServiceMetrics(metrics map[string]int64) dto.ServiceMetrics {
+	serviceMetrics := dto.ServiceMetrics{
+		Failed:   metrics["failed"],
+		Request:  metrics["request"],
+		Complete: metrics["complete"],
+		Issue:    metrics["issue"],
+		Reject:   metrics["reject"],
+	}
+
+	// Calculate total
+	serviceMetrics.Total = serviceMetrics.Failed + serviceMetrics.Request + serviceMetrics.Complete + serviceMetrics.Issue + serviceMetrics.Reject
+
+	return serviceMetrics
 }

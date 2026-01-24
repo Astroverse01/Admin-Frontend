@@ -103,6 +103,7 @@ type Chat struct {
 	RatePerMinute   float64            `bson:"ratePerMinute" json:"ratePerMinute"`
 	SpendMoney      float64            `bson:"spendMoney" json:"spendMoney"`
 	PaymentReceived int                `bson:"paymentReceived" json:"paymentReceived"`
+	LastStatus      string             `bson:"lastStatus" json:"lastStatus"`
 	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt"`
 }
 
@@ -113,9 +114,11 @@ type IvrCall struct {
 	AstroID         string             `bson:"astroId" json:"astroId"`
 	UserID          string             `bson:"userId" json:"userId"`
 	URL             string             `bson:"url" json:"url"`
+	UserUrl         string             `bson:"userUrl" json:"userUrl"`
 	RatePerMinute   float64            `bson:"ratePerMinute" json:"ratePerMinute"`
 	SpendMoney      float64            `bson:"spendMoney" json:"spendMoney"`
 	PaymentReceived int                `bson:"paymentReceived" json:"paymentReceived"`
+	LastStatus      string             `bson:"lastStatus" json:"lastStatus"`
 	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt"`
 }
 
@@ -129,5 +132,6 @@ type VideoCall struct {
 	RatePerMinute   float64            `bson:"ratePerMinute" json:"ratePerMinute"`
 	SpendMoney      float64            `bson:"spendMoney" json:"spendMoney"`
 	PaymentReceived int                `bson:"paymentReceived" json:"paymentReceived"`
+	LastStatus      string             `bson:"lastStatus" json:"lastStatus"`
 	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt"`
 }

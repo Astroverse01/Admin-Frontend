@@ -3,6 +3,7 @@ package repository
 import (
 	"admin-be/internal/models"
 	"context"
+	"time"
 )
 
 // UserRepository defines the interface for user data operations
@@ -67,5 +68,6 @@ type ServiceRepository interface {
 	UpdateChatByChatID(ctx context.Context, chatID string, update map[string]interface{}) error
 	UpdateIvrByIvrID(ctx context.Context, ivrID string, update map[string]interface{}) error
 	UpdateVideoByVideoID(ctx context.Context, videoID string, update map[string]interface{}) error
+	CountByLastStatus(ctx context.Context, collectionName string, startTime, endTime time.Time) (map[string]int64, error)
 }
 

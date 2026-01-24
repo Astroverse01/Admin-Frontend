@@ -1,6 +1,5 @@
 package main
 
-import "strings"
 import (
 	"log"
 	"os"
@@ -37,6 +36,7 @@ func main() {
 	astroProblemRepo := repository.NewAstroProblemRepository(mongoDB)
 	horoscopeRepo := repository.NewHoroscopeRepository(mongoDB)
 	dailyReportRepo := repository.NewDailyReportRepository(mongoDB)
+	serviceRepo := repository.NewServiceRepository(mongoDB)
 
 	// Initialize services
 	authService := services.NewAuthService(cfg.JWTSecret)
@@ -48,6 +48,7 @@ func main() {
 	astroProblemService := services.NewAstroProblemService(astroProblemRepo, astroRepo)
 	horoscopeService := services.NewHoroscopeService(horoscopeRepo)
 	schedulerService := services.NewSchedulerService(dailyReportRepo, emailService, cfg)
+	dashboardService := services.NewDashboardService(serviceRepo)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -58,6 +59,7 @@ func main() {
 	astroProblemHandler := handlers.NewAstroProblemHandler(astroProblemService)
 	horoscopeHandler := handlers.NewHoroscopeHandler(horoscopeService, cfg.AdminID)
 	schedulerHandler := handlers.NewSchedulerHandler(schedulerService)
+	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
 
 	// Setup router
 	router := gin.Default()
@@ -96,6 +98,9 @@ func main() {
 	admin := router.Group("/admin")
 	admin.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	{
+		// Dashboard
+		admin.GET("/dashboard/metrics", dashboardHandler.GetDailyMetrics)
+
 		// User management
 		admin.GET("/users", userHandler.ListUsers)
 		admin.PATCH("/users/:userId/deactivate", userHandler.DeactivateUser)

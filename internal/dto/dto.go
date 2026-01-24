@@ -111,6 +111,7 @@ type ProblemListResponse struct {
 type ProblemData struct {
 	ProblemID    string `json:"problemId"`
 	UserID       string `json:"userId,omitempty"`
+	FullName     string `json:"fullName,omitempty"`
 	AstroID      string `json:"astroId,omitempty"`
 	Status       string `json:"status"`
 	Comment      string `json:"comment"`
@@ -237,4 +238,28 @@ type GenerateReportResponse struct {
 	Success bool          `json:"success"`
 	Message string        `json:"message"`
 	Files   []CSVFileInfo `json:"files"`
+}
+
+// DashboardMetricsResponse represents dashboard metrics response
+type DashboardMetricsResponse struct {
+	Success bool              `json:"success"`
+	Data    DashboardMetrics  `json:"data"`
+}
+
+// DashboardMetrics represents daily metrics for all services
+type DashboardMetrics struct {
+	Date     string           `json:"date"`
+	Chat     ServiceMetrics   `json:"chat"`
+	IvrCall  ServiceMetrics   `json:"ivrCall"`
+	VideoCall ServiceMetrics  `json:"videoCall"`
+}
+
+// ServiceMetrics represents metrics grouped by lastStatus
+type ServiceMetrics struct {
+	Failed   int64 `json:"failed"`
+	Request  int64 `json:"request"`
+	Complete int64 `json:"complete"`
+	Issue    int64 `json:"issue"`
+	Reject   int64 `json:"reject"`
+	Total    int64 `json:"total"`
 }

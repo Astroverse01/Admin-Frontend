@@ -19,7 +19,7 @@ type userProblemRepository struct {
 func NewUserProblemRepository(db *database.MongoDB) UserProblemRepository {
 	return &userProblemRepository{
 		db:         db,
-		collection: db.GetCollection("userProblems"),
+		collection: db.GetCollection("userProblem"),
 	}
 }
 
