@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api-admin.astrosway.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8082/';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -146,6 +146,14 @@ export const schedulerAPI = {
       responseType: 'blob', // Important for file download
     });
     return response;
+  },
+};
+
+// Dashboard API
+export const dashboardAPI = {
+  getMetrics: async () => {
+    const response = await api.get('/admin/dashboard/metrics');
+    return response.data;
   },
 };
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { complaintsAPI } from '../services/api';
-import { ChevronLeft, ChevronRight, Check, X, RefreshCw, ExternalLink, Play } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Check, X, RefreshCw, Copy } from 'lucide-react';
 import { format } from 'date-fns';
 
 const UserServiceComplaints = () => {
@@ -14,6 +14,7 @@ const UserServiceComplaints = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [complaintDetails, setComplaintDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   const fetchComplaints = async () => {
     setLoading(true);
@@ -147,10 +148,42 @@ const UserServiceComplaints = () => {
       setComplaintDetails(response.data || response);
     } catch (error) {
       console.error('Error fetching complaint details:', error);
-      alert(error.response?.data?.message || 'Failed to fetch complaint details');
+      const errorMessage = error.response?.data?.message || 'Failed to fetch complaint details';
+      
+      // Check if error is about serviceType mismatch
+      if (errorMessage.includes('serviceType mismatch') || errorMessage.includes('but serviceType mismatch')) {
+        alert('no url found for this orderId');
+      } else {
+        alert(errorMessage);
+      }
       setShowDetailsModal(false);
     } finally {
       setDetailsLoading(false);
+    }
+  };
+
+  const handleCopyUrl = async (url) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy URL:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = url;
+      textArea.style.position = 'fixed';
+      textArea.style.opacity = '0';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        setCopiedUrl(true);
+        setTimeout(() => setCopiedUrl(false), 2000);
+      } catch (err) {
+        alert('Failed to copy URL. Please copy it manually.');
+      }
+      document.body.removeChild(textArea);
     }
   };
 
@@ -480,16 +513,22 @@ const UserServiceComplaints = () => {
                   {complaintDetails.url && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Audio/Media URL</label>
-                      <a
-                        href={complaintDetails.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-primary-600 hover:text-primary-800 hover:underline break-all"
-                      >
-                        <Play className="w-4 h-4 flex-shrink-0" />
-                        <span className="break-all">{complaintDetails.url}</span>
-                        <ExternalLink className="w-4 h-4 flex-shrink-0" />
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={complaintDetails.url}
+                          readOnly
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-900 break-all focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                        <button
+                          onClick={() => handleCopyUrl(complaintDetails.url)}
+                          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
+                          title="Copy URL"
+                        >
+                          <Copy className="w-4 h-4" />
+                          {copiedUrl ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
                     </div>
                   )}
 
