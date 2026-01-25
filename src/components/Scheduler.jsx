@@ -70,6 +70,7 @@ const Scheduler = () => {
     }
   };
 
+
   // Get today's date in YYYY-MM-DD format
   const getTodayDate = () => {
     const today = new Date();
@@ -224,6 +225,7 @@ const Scheduler = () => {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-gray-600">
               {[
                 'appointments',
+                'astrologer',
                 'chat',
                 'conversionHistory',
                 'feedback',

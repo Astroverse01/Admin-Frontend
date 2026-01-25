@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   Sparkles,
+  Upload,
 } from 'lucide-react';
 
 const Layout = ({ children }) => {
@@ -29,6 +30,7 @@ const Layout = ({ children }) => {
     { path: '/user-general-complaints', icon: AlertCircle, label: 'User General Complaints' },
     { path: '/astro-general-complaints', icon: AlertCircle, label: 'Astro General Complaints' },
     { path: '/horoscopes', icon: Calendar, label: 'Horoscopes' },
+    { path: '/feedbacks', icon: Upload, label: 'Bulk Upload Feedbacks' },
     { path: '/scheduler', icon: Settings, label: 'Scheduler' },
   ];
 

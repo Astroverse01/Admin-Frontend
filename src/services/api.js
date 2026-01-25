@@ -157,5 +157,13 @@ export const dashboardAPI = {
   },
 };
 
+// Feedbacks API
+export const feedbacksAPI = {
+  bulkCreate: async (feedbacks) => {
+    const response = await api.post('/admin/feedbacks/bulk', feedbacks);
+    return response.data;
+  },
+};
+
 export default api;
 
