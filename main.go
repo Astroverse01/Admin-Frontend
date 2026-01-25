@@ -37,6 +37,7 @@ func main() {
 	horoscopeRepo := repository.NewHoroscopeRepository(mongoDB)
 	dailyReportRepo := repository.NewDailyReportRepository(mongoDB)
 	serviceRepo := repository.NewServiceRepository(mongoDB)
+	feedbackRepo := repository.NewFeedbackRepository(mongoDB)
 
 	// Initialize services
 	authService := services.NewAuthService(cfg.JWTSecret)
@@ -49,6 +50,7 @@ func main() {
 	horoscopeService := services.NewHoroscopeService(horoscopeRepo)
 	schedulerService := services.NewSchedulerService(dailyReportRepo, emailService, cfg)
 	dashboardService := services.NewDashboardService(serviceRepo)
+	feedbackService := services.NewFeedbackService(feedbackRepo)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -60,6 +62,7 @@ func main() {
 	horoscopeHandler := handlers.NewHoroscopeHandler(horoscopeService, cfg.AdminID)
 	schedulerHandler := handlers.NewSchedulerHandler(schedulerService)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
+	feedbackHandler := handlers.NewFeedbackHandler(feedbackService)
 
 	// Setup router
 	router := gin.Default()
@@ -133,6 +136,9 @@ func main() {
 		admin.POST("/scheduler/trigger", schedulerHandler.TriggerManually)
 		admin.POST("/scheduler/generate", schedulerHandler.GenerateReports)
 		admin.GET("/scheduler/download/:fileName", schedulerHandler.DownloadReport)
+
+		// Feedback management
+		admin.POST("/feedbacks/bulk", feedbackHandler.BulkCreateFeedbacks)
 	}
 
 	// Start daily report scheduler

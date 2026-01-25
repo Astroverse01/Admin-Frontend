@@ -135,3 +135,15 @@ type VideoCall struct {
 	LastStatus      string             `bson:"lastStatus" json:"lastStatus"`
 	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt"`
 }
+
+// Feedback represents a feedback entry
+type Feedback struct {
+	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	AstroID    string             `bson:"astroId" json:"astroId"`
+	Comment    string             `bson:"comment" json:"comment"`
+	Name       string             `bson:"name" json:"name"`
+	Rating     int                `bson:"rating" json:"rating"`
+	ProfilePic string             `bson:"profilePic" json:"profilePic"`
+	CreatedOn  time.Time          `bson:"createdOn" json:"createdOn"`
+	FeedbackID string             `bson:"feedbackId" json:"feedbackId"`
+}

@@ -71,3 +71,9 @@ type ServiceRepository interface {
 	CountByLastStatus(ctx context.Context, collectionName string, startTime, endTime time.Time) (map[string]int64, error)
 }
 
+// FeedbackRepository defines the interface for feedback operations
+type FeedbackRepository interface {
+	Create(ctx context.Context, feedback *models.Feedback) error
+	BulkCreate(ctx context.Context, feedbacks []*models.Feedback) error
+}
+

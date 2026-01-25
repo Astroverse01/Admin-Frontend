@@ -263,3 +263,23 @@ type ServiceMetrics struct {
 	Reject   int64 `json:"reject"`
 	Total    int64 `json:"total"`
 }
+
+// FeedbackRequestItem represents a single feedback item in bulk request
+type FeedbackRequestItem struct {
+	AstroID    string `json:"astroId" validate:"required"`
+	Comment    string `json:"comment" validate:"required"`
+	Name       string `json:"name" validate:"required"`
+	Rating     int    `json:"rating" validate:"required,min=1,max=5"`
+	ProfilePic string `json:"profilePic"`
+	FeedbackID string `json:"feedbackId" validate:"required"`
+}
+
+// BulkFeedbackRequestPayload represents the incoming array of feedback items
+type BulkFeedbackRequestPayload []FeedbackRequestItem
+
+// BulkFeedbackResponse represents bulk create feedback
+type BulkFeedbackResponse struct {
+	Success    bool     `json:"success"`
+	Message    string   `json:"message"`
+	FeedbackID []string `json:"feedbackId"`
+}

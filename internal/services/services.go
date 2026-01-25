@@ -1059,3 +1059,50 @@ func (s *DashboardService) convertToServiceMetrics(metrics map[string]int64) dto
 
 	return serviceMetrics
 }
+
+// FeedbackService handles feedback management logic
+type FeedbackService struct {
+	feedbackRepo repository.FeedbackRepository
+}
+
+func NewFeedbackService(feedbackRepo repository.FeedbackRepository) *FeedbackService {
+	return &FeedbackService{
+		feedbackRepo: feedbackRepo,
+	}
+}
+
+func (s *FeedbackService) BulkCreateFeedbacks(ctx context.Context, payload dto.BulkFeedbackRequestPayload) (*dto.BulkFeedbackResponse, error) {
+	if len(payload) == 0 {
+		return nil, fmt.Errorf("no feedback data provided")
+	}
+
+	var feedbacks []*models.Feedback
+	var feedbackIDs []string
+
+	for _, item := range payload {
+		now := time.Now()
+		feedback := &models.Feedback{
+			AstroID:    item.AstroID,
+			Comment:    item.Comment,
+			Name:       item.Name,
+			Rating:     item.Rating,
+			ProfilePic: item.ProfilePic,
+			CreatedOn:  now,
+			FeedbackID: item.FeedbackID,
+		}
+
+		feedbacks = append(feedbacks, feedback)
+		feedbackIDs = append(feedbackIDs, feedback.FeedbackID)
+	}
+
+	// Bulk insert all feedbacks
+	if err := s.feedbackRepo.BulkCreate(ctx, feedbacks); err != nil {
+		return nil, fmt.Errorf("failed to create feedbacks: %w", err)
+	}
+
+	return &dto.BulkFeedbackResponse{
+		Success:    true,
+		Message:    "Feedbacks created successfully",
+		FeedbackID: feedbackIDs,
+	}, nil
+}
