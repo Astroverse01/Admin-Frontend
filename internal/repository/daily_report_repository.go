@@ -51,4 +51,3 @@ func (r *dailyReportRepository) GetTodayRecords(ctx context.Context, collectionN
 
 	return results, nil
 }
-

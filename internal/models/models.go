@@ -17,7 +17,7 @@ type User struct {
 	TotalAmount float64            `bson:"totalAmount" json:"totalAmount"`
 	FCMToken    string             `bson:"fcmToken" json:"fcmToken"`
 	Platform    string             `bson:"platform" json:"platform"`
-	CreatedAt   time.Time          `bson:"createdAt" json:"createdAt"`
+	CreatedOn   time.Time          `bson:"createdOn" json:"createdOn"`
 	UpdatedAt   time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
 
@@ -33,7 +33,7 @@ type Astrologer struct {
 	TotalEarned float64            `bson:"totalEarned" json:"totalEarned"`
 	FCMToken    string             `bson:"fcmToken" json:"fcmToken"`
 	Platform    string             `bson:"platform" json:"platform"`
-	CreatedAt   time.Time          `bson:"createdAt" json:"createdAt"`
+	CreatedOn   time.Time          `bson:"createdOn" json:"createdOn"`
 	UpdatedAt   time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
 
@@ -62,7 +62,7 @@ type UserProblem struct {
 	Comment      string             `bson:"comment" json:"comment"`
 	ProblemTypes string             `bson:"problemTypes" json:"problemTypes"`
 	Reason       string             `bson:"reason" json:"reason"`
-	CreatedAt    time.Time          `bson:"createdAt" json:"createdAt"`
+	CreatedOn    time.Time          `bson:"createdOn" json:"createdOn"`
 	UpdatedAt    time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
 
@@ -75,7 +75,7 @@ type AstroProblem struct {
 	Comment      string             `bson:"comment" json:"comment"`
 	ProblemTypes string             `bson:"problemTypes" json:"problemTypes"`
 	Reason       string             `bson:"reason" json:"reason"`
-	CreatedAt    time.Time          `bson:"createdAt" json:"createdAt"`
+	CreatedOn    time.Time          `bson:"createdOn" json:"createdOn"`
 	UpdatedAt    time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
 
@@ -104,7 +104,7 @@ type Chat struct {
 	SpendMoney      float64            `bson:"spendMoney" json:"spendMoney"`
 	PaymentReceived int                `bson:"paymentReceived" json:"paymentReceived"`
 	LastStatus      string             `bson:"lastStatus" json:"lastStatus"`
-	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt"`
+	CreatedOn       time.Time          `bson:"createdOn" json:"createdOn"`
 }
 
 // IvrCall represents an IVR service record
@@ -119,7 +119,7 @@ type IvrCall struct {
 	SpendMoney      float64            `bson:"spendMoney" json:"spendMoney"`
 	PaymentReceived int                `bson:"paymentReceived" json:"paymentReceived"`
 	LastStatus      string             `bson:"lastStatus" json:"lastStatus"`
-	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt"`
+	CreatedOn       time.Time          `bson:"createdOn" json:"createdOn"`
 }
 
 // VideoCall represents a video service record
@@ -133,7 +133,7 @@ type VideoCall struct {
 	SpendMoney      float64            `bson:"spendMoney" json:"spendMoney"`
 	PaymentReceived int                `bson:"paymentReceived" json:"paymentReceived"`
 	LastStatus      string             `bson:"lastStatus" json:"lastStatus"`
-	CreatedAt       time.Time          `bson:"createdAt" json:"createdAt"`
+	CreatedOn       time.Time          `bson:"createdOn" json:"createdOn"`
 }
 
 // Feedback represents a feedback entry

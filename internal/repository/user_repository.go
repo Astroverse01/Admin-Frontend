@@ -31,7 +31,7 @@ func (r *userRepository) FindAll(ctx context.Context, filter map[string]interfac
 	opts := options.Find().
 		SetSkip(skip).
 		SetLimit(limit).
-		SetSort(bson.D{{Key: "createdAt", Value: -1}})
+		SetSort(bson.D{{Key: "createdOn", Value: -1}})
 
 	log.Println("[UserRepository.FindAll] Executing Find query on MongoDB")
 	cursor, err := r.collection.Find(ctx, filter, opts)

@@ -12,27 +12,24 @@ import (
 	"admin-be/internal/repository"
 	"admin-be/internal/utils"
 
-	"github.com/robfig/cron/v3"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type SchedulerService struct {
-	repo         repository.DailyReportRepository
-	emailService *EmailService
-	cfg          *config.Config
-	cron         *cron.Cron
-	outputDir    string
-	collections  []string
+	repo        repository.DailyReportRepository
+	cfg         *config.Config
+	outputDir   string
+	collections []string
 }
 
-func NewSchedulerService(repo repository.DailyReportRepository, emailService *EmailService, cfg *config.Config) *SchedulerService {
+func NewSchedulerService(repo repository.DailyReportRepository, cfg *config.Config) *SchedulerService {
 	return &SchedulerService{
-		repo:         repo,
-		emailService: emailService,
-		cfg:          cfg,
-		cron:         cron.New(cron.WithSeconds()),
-		outputDir:    filepath.Join(os.TempDir(), "daily_reports"),
+		repo:      repo,
+		cfg:       cfg,
+		outputDir: filepath.Join(os.TempDir(), "daily_reports"),
 		collections: []string{
 			"appointments",
+			"astrologer",
 			"chat",
 			"conversionHistory",
 			"feedback",
@@ -66,7 +63,7 @@ func (s *SchedulerService) Stop() {
 	log.Println("[Scheduler] Scheduler service stopped")
 }
 
-// GenerateAndSendDailyReports fetches the previous day's records from all collections and sends them via email
+// GenerateAndSendDailyReports fetches the previous day's records from all collections and generates CSV files
 func (s *SchedulerService) GenerateAndSendDailyReports() error {
 	log.Println("[Scheduler] Starting daily report generation...")
 
@@ -116,29 +113,25 @@ func (s *SchedulerService) GenerateAndSendDailyReports() error {
 	}
 
 	if len(csvFilePaths) == 0 {
-		log.Println("[Scheduler] No CSV files generated. Skipping email send.")
+		log.Println("[Scheduler] No CSV files generated.")
 		return nil
 	}
 
-	// Send email with all CSV files
-	log.Printf("[Scheduler] Sending email with %d CSV files...", len(csvFilePaths))
-	if err := s.emailService.SendCSVFilesByEmail(csvFilePaths, startTime.Format("2006-01-02")); err != nil {
-		log.Printf("[Scheduler] Error sending email: %v", err)
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-
-	log.Println("[Scheduler] Daily report generation completed successfully")
-
-	// Clean up CSV files after sending (optional)
-	go s.cleanupCSVFiles(csvFilePaths)
-
+	log.Printf("[Scheduler] Daily report generation completed successfully. Generated %d CSV files", len(csvFilePaths))
 	return nil
+}
+
+// CollectionReportResult represents the result of generating a report for a collection
+type CollectionReportResult struct {
+	FilePath    string
+	RecordCount int
+	Error       error
 }
 
 // GenerateReportsByDateRange generates reports for a specific date range
 // startDate format: YYYY-MM-DD, endDate format: YYYY-MM-DD
-// Collects data from 5 AM of startDate to 11:55 PM of endDate
-func (s *SchedulerService) GenerateReportsByDateRange(ctx context.Context, startDate, endDate string) (map[string]string, error) {
+// Collects data from 12:05 AM of startDate to 11:59 PM of endDate
+func (s *SchedulerService) GenerateReportsByDateRange(ctx context.Context, startDate, endDate string) (map[string]CollectionReportResult, error) {
 	log.Printf("[Scheduler] Starting report generation for date range: %s to %s", startDate, endDate)
 
 	// Parse dates
@@ -153,8 +146,8 @@ func (s *SchedulerService) GenerateReportsByDateRange(ctx context.Context, start
 
 	// Set start time to 12:05 AM UTC (00:05)
 	startTime = time.Date(startTime.Year(), startTime.Month(), startTime.Day(), 0, 5, 0, 0, time.UTC)
-	// Set end time to 11:55 PM UTC (23:55)
-	endTime = time.Date(endTime.Year(), endTime.Month(), endTime.Day(), 23, 55, 0, 0, time.UTC)
+	// Set end time to 11:59 PM UTC (23:59)
+	endTime = time.Date(endTime.Year(), endTime.Month(), endTime.Day(), 23, 59, 0, 0, time.UTC)
 
 	log.Printf("[Scheduler] Fetching records from %s to %s", startTime.Format(time.RFC3339), endTime.Format(time.RFC3339))
 
@@ -163,7 +156,16 @@ func (s *SchedulerService) GenerateReportsByDateRange(ctx context.Context, start
 		return nil, fmt.Errorf("failed to create output directory: %w", err)
 	}
 
-	csvFiles := make(map[string]string) // collection name -> file path
+	csvFiles := make(map[string]CollectionReportResult) // collection name -> result
+
+	// Initialize all collections in the result map first to ensure they're all included
+	for _, collectionName := range s.collections {
+		csvFiles[collectionName] = CollectionReportResult{
+			FilePath:    "",
+			RecordCount: 0,
+			Error:       nil,
+		}
+	}
 
 	// Process each collection
 	for _, collectionName := range s.collections {
@@ -171,25 +173,57 @@ func (s *SchedulerService) GenerateReportsByDateRange(ctx context.Context, start
 
 		// Fetch records from MongoDB
 		records, err := s.repo.GetTodayRecords(ctx, collectionName, startTime, endTime)
+		recordCount := 0
 		if err != nil {
 			log.Printf("[Scheduler] Error fetching records from %s: %v", collectionName, err)
-			continue
+			// Still try to generate empty CSV even on fetch error
+			records = []bson.M{}
+		} else {
+			recordCount = len(records)
+			log.Printf("[Scheduler] Found %d records in collection: %s", recordCount, collectionName)
 		}
-
-		log.Printf("[Scheduler] Found %d records in collection: %s", len(records), collectionName)
 
 		// Generate CSV file even if no records (empty CSV) with date range in filename
 		csvPath, err := utils.GenerateCSVWithDateRange(records, collectionName, s.outputDir, startTime, endTime)
 		if err != nil {
 			log.Printf("[Scheduler] Error generating CSV for %s: %v", collectionName, err)
+			csvFiles[collectionName] = CollectionReportResult{
+				FilePath:    "",
+				RecordCount: recordCount,
+				Error:       err,
+			}
 			continue
 		}
 
-		csvFiles[collectionName] = csvPath
+		csvFiles[collectionName] = CollectionReportResult{
+			FilePath:    csvPath,
+			RecordCount: recordCount,
+			Error:       nil,
+		}
 		log.Printf("[Scheduler] Generated CSV for %s: %s", collectionName, csvPath)
 	}
 
-	log.Printf("[Scheduler] Report generation completed. Generated %d CSV files", len(csvFiles))
+	log.Printf("[Scheduler] Report generation completed. Processed %d collections", len(csvFiles))
+
+	// Verify all collections are present in the result
+	expectedCount := len(s.collections)
+	actualCount := len(csvFiles)
+	if actualCount != expectedCount {
+		log.Printf("[Scheduler] WARNING: Expected %d collections but only %d in result. Missing collections:", expectedCount, actualCount)
+		for _, collectionName := range s.collections {
+			if _, exists := csvFiles[collectionName]; !exists {
+				log.Printf("[Scheduler] WARNING: Missing collection: %s", collectionName)
+				// Add it with empty result
+				csvFiles[collectionName] = CollectionReportResult{
+					FilePath:    "",
+					RecordCount: 0,
+					Error:       fmt.Errorf("collection was not processed"),
+				}
+			}
+		}
+	}
+
+	log.Printf("[Scheduler] Final result contains %d collections", len(csvFiles))
 	return csvFiles, nil
 }
 

@@ -27,7 +27,7 @@ func (r *userProblemRepository) FindAll(ctx context.Context, filter map[string]i
 	opts := options.Find().
 		SetSkip(skip).
 		SetLimit(limit).
-		SetSort(bson.D{{Key: "createdAt", Value: -1}})
+		SetSort(bson.D{{Key: "createdOn", Value: -1}})
 
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {
@@ -61,4 +61,3 @@ func (r *userProblemRepository) UpdateByProblemID(ctx context.Context, problemID
 func (r *userProblemRepository) Count(ctx context.Context, filter map[string]interface{}) (int64, error) {
 	return r.collection.CountDocuments(ctx, filter)
 }
-

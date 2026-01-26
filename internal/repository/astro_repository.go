@@ -27,7 +27,7 @@ func (r *astroRepository) FindAll(ctx context.Context, filter map[string]interfa
 	opts := options.Find().
 		SetSkip(skip).
 		SetLimit(limit).
-		SetSort(bson.D{{Key: "createdAt", Value: -1}})
+		SetSort(bson.D{{Key: "createdOn", Value: -1}})
 
 	cursor, err := r.collection.Find(ctx, filter, opts)
 	if err != nil {

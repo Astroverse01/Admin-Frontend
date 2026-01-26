@@ -4,6 +4,7 @@ import (
 	"admin-be/internal/dto"
 	"admin-be/internal/services"
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -77,14 +78,24 @@ func (h *SchedulerHandler) GenerateReports(c *gin.Context) {
 		return
 	}
 
-	// Prepare response with file information
+	// Prepare response with file information - include ALL collections
+	log.Printf("[SchedulerHandler] Received %d collections from service", len(csvFiles))
 	var files []dto.CSVFileInfo
-	for collection, filePath := range csvFiles {
-		fileName := filepath.Base(filePath)
+	for collection, result := range csvFiles {
+		var fileName string
+		if result.FilePath != "" {
+			fileName = filepath.Base(result.FilePath)
+		} else {
+			// Generate filename even if file creation failed (for consistency)
+			// This ensures the frontend knows the report was attempted
+			fileName = fmt.Sprintf("%s_%s_to_%s.csv", collection, req.StartDate, req.EndDate)
+		}
 		files = append(files, dto.CSVFileInfo{
-			Collection: collection,
-			FileName:   fileName,
+			Collection:  collection,
+			FileName:    fileName,
+			RecordCount: result.RecordCount,
 		})
+		log.Printf("[SchedulerHandler] Added collection to response: %s (records: %d)", collection, result.RecordCount)
 	}
 
 	log.Printf("[SchedulerHandler] Successfully generated %d reports", len(files))

@@ -48,7 +48,7 @@ func main() {
 	userProblemService := services.NewUserProblemService(userProblemRepo, userRepo)
 	astroProblemService := services.NewAstroProblemService(astroProblemRepo, astroRepo)
 	horoscopeService := services.NewHoroscopeService(horoscopeRepo)
-	schedulerService := services.NewSchedulerService(dailyReportRepo, emailService, cfg)
+	schedulerService := services.NewSchedulerService(dailyReportRepo, cfg)
 	dashboardService := services.NewDashboardService(serviceRepo)
 	feedbackService := services.NewFeedbackService(feedbackRepo)
 

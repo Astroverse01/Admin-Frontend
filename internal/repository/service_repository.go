@@ -99,15 +99,15 @@ func (r *serviceRepository) UpdateVideoByVideoID(ctx context.Context, videoID st
 // CountByLastStatus counts records grouped by lastStatus for a given date range
 func (r *serviceRepository) CountByLastStatus(ctx context.Context, collectionName string, startTime, endTime time.Time) (map[string]int64, error) {
 	collection := r.db.GetCollection(collectionName)
-	
-	// Filter by date range (using createdAt field)
+
+	// Filter by date range (using createdOn field)
 	filter := bson.M{
-		"createdAt": bson.M{
+		"createdOn": bson.M{
 			"$gte": startTime,
 			"$lt":  endTime,
 		},
 	}
-	
+
 	// Use aggregation pipeline to group by lastStatus
 	pipeline := []bson.M{
 		{"$match": filter},
@@ -116,21 +116,21 @@ func (r *serviceRepository) CountByLastStatus(ctx context.Context, collectionNam
 			"count": bson.M{"$sum": 1},
 		}},
 	}
-	
+
 	cursor, err := collection.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
-	
+
 	result := make(map[string]int64)
-	
+
 	// Initialize all possible statuses with 0
 	statuses := []string{"failed", "request", "complete", "issue", "reject"}
 	for _, status := range statuses {
 		result[status] = 0
 	}
-	
+
 	// Populate counts from aggregation results
 	for cursor.Next(ctx) {
 		var doc struct {
@@ -157,6 +157,6 @@ func (r *serviceRepository) CountByLastStatus(ctx context.Context, collectionNam
 			// For now, we'll ignore unexpected statuses
 		}
 	}
-	
+
 	return result, nil
 }
