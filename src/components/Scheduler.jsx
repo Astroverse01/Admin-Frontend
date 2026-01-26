@@ -29,11 +29,41 @@ const Scheduler = () => {
     
     try {
       const response = await schedulerAPI.generateReports(startDate, endDate);
+      
+      // Debug: Log the full response to see what backend is sending
+      console.log('Full response from backend:', response);
+      console.log('Response files:', response.files);
+      console.log('Response files length:', response.files?.length);
+      
+      // The backend returns { success: true, message: "...", files: [...] }
+      // Since schedulerAPI.generateReports returns response.data, we get the data directly
+      let files = [];
+      
+      if (Array.isArray(response.files)) {
+        // Direct assignment - backend sends files as an array
+        files = [...response.files];
+        console.log('✅ Files array found with', files.length, 'items');
+      } else {
+        console.error('❌ Files is not an array:', typeof response.files, response.files);
+      }
+      
+      // Log all file collections to verify astrologer is included
+      console.log('All file collections:', files.map(f => f.collection));
+      console.log('Astrologer report present:', files.some(f => f.collection === 'astrologer'));
+      
+      // Normalize collection names for display (astros -> astrologer) if needed
+      files = files.map(file => {
+        if (file.collection === 'astros') {
+          return { ...file, collection: 'astrologer' };
+        }
+        return file;
+      });
+      
       setResult({
         success: true,
         message: response.message || 'Reports generated successfully',
       });
-      setGeneratedFiles(response.files || []);
+      setGeneratedFiles(files);
     } catch (error) {
       setResult({
         success: false,
@@ -96,7 +126,7 @@ const Scheduler = () => {
             <h2 className="text-2xl font-semibold text-gray-800 mb-2">Date Range Report Generator</h2>
             <p className="text-gray-600">
               Select a date range to generate CSV reports from all collections.
-              Data will be collected from 12:05 AM of start date to 11:55 PM of end date.
+              Data will be collected from 12:05 AM of start date to 11:59 PM of end date.
             </p>
           </div>
 
@@ -129,7 +159,7 @@ const Scheduler = () => {
                   min={startDate}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
                 />
-                <p className="text-xs text-gray-500 mt-1">Data until 11:55 PM</p>
+                <p className="text-xs text-gray-500 mt-1">Data until 11:59 PM</p>
               </div>
             </div>
           </div>
@@ -194,27 +224,35 @@ const Scheduler = () => {
                 Generated Reports ({generatedFiles.length})
               </h3>
               <div className="space-y-2">
-                {generatedFiles.map((file) => (
-                  <div
-                    key={file.fileName}
-                    className="flex items-center justify-between bg-white p-4 rounded-lg border border-gray-200 hover:border-primary-300 transition"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <FileText className="w-5 h-5 text-gray-500" />
-                      <div>
-                        <p className="font-medium text-gray-800">{file.collection}</p>
-                        <p className="text-xs text-gray-500">{file.fileName}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDownload(file.fileName)}
-                      className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
+                {generatedFiles.map((file, index) => {
+                  // Use a combination of collection and index to ensure unique keys
+                  // This prevents React from skipping items if there are any duplicate keys
+                  const uniqueKey = `${file.collection || 'unknown'}-${file.fileName || index}-${index}`;
+                  const collectionName = file.collection || file.name || 'Unknown Collection';
+                  const fileName = file.fileName || file.filename || `report-${index}.csv`;
+                  
+                  return (
+                    <div
+                      key={uniqueKey}
+                      className="flex items-center justify-between bg-white p-4 rounded-lg border border-gray-200 hover:border-primary-300 transition"
                     >
-                      <Download className="w-4 h-4" />
-                      <span>Download</span>
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center space-x-3">
+                        <FileText className="w-5 h-5 text-gray-500" />
+                        <div>
+                          <p className="font-medium text-gray-800">{collectionName}</p>
+                          <p className="text-xs text-gray-500">{fileName}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDownload(fileName)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Download</span>
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
