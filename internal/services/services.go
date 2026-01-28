@@ -387,64 +387,24 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 	serviceType = strings.TrimSpace(serviceType)
 	orderId = strings.TrimSpace(orderId)
 
-	// Normalize serviceType to match collection names (camelCase for ivrCall and videoCall)
-	//serviceTypeLower := strings.ToLower(serviceType)
-
-	// Map to correct camelCase format based on collection names
-	switch serviceType {
-	case "ivrCall":
-		serviceType = "ivrCall" // Collection name is "ivrCall"
-	case "videoCall":
-		serviceType = "videoCall" // Collection name is "videoCall"
-	case "chat":
-		serviceType = "chat" // Collection name is "chat"
-	default:
-		// Preserve original if it doesn't match known patterns
-		// No assignment needed - serviceType already has its value
-	}
-
-	// First, verify that a complaint exists for this orderId and serviceType
-	// Repository now handles case-insensitive matching via regex
-	log.Printf("Searching for complaint with orderId: %s, serviceType: %s", orderId, serviceType)
-	complaint, err := s.serviceReportRepo.FindByOrderIDAndServiceType(ctx, orderId, serviceType)
-	if err != nil {
-		// Fallback: If searching for "ivrCall" fails, try "call" (legacy data might use "call")
-		if serviceType == "ivrCall" {
-			log.Printf("Initial search failed for 'ivrCall', trying fallback 'call'")
-			complaint, err = s.serviceReportRepo.FindByOrderIDAndServiceType(ctx, orderId, "ivrCall")
-			if err == nil {
-				log.Printf("Found complaint using fallback 'call', updating serviceType to 'ivrCall'")
-				serviceType = "ivrCall" // Keep the normalized serviceType for switch statement
-			}
-		}
-
-		if err != nil {
-			if errors.Is(err, mongo.ErrNoDocuments) {
-				log.Printf("No complaint found for orderId: %s, serviceType: %s", orderId, serviceType)
-				return nil, fmt.Errorf("complaint not found for orderId %s and serviceType %s", orderId, serviceType)
-			}
-			log.Printf("Error finding complaint: %v", err)
-			return nil, fmt.Errorf("failed to find complaint: %w", err)
-		}
-	}
-	log.Printf("Complaint found: reportID=%s, orderID=%s, serviceType=%s", complaint.ReportID, complaint.OrderID, complaint.ServiceType)
+	log.Printf("Fetching service details with orderId: %s, serviceType: %s", orderId, serviceType)
 
 	var serviceData dto.ServiceData
-	reportID := complaint.ReportID
 
+	// Step 1: Based on serviceType, determine which collection to query
+	// Step 2: Map orderId to the correct field and fetch the record from that collection
 	switch serviceType {
 	case "chat":
-		// orderId is a foreign key in serviceReports collection that references chatId in the chat collection
-		log.Printf("Looking up chat with chatId (orderId): %s", orderId)
+		// Collection: chat
+		// Field mapping: orderId → chatId
+		log.Printf("Querying 'chat' collection with orderId as chatId: %s", orderId)
 		chat, err := s.serviceRepo.FindChatByChatID(ctx, orderId)
 		if err != nil {
-			log.Printf("Error finding chat by chatId %s: %v (error type: %T)", orderId, err, err)
 			if errors.Is(err, mongo.ErrNoDocuments) {
 				return nil, fmt.Errorf("chat service not found for orderId %s", orderId)
 			}
 			return nil, fmt.Errorf("failed to find chat service: %w", err)
 		}
-		log.Printf("Chat object found: %+v", chat)
 		serviceData = dto.ServiceData{
 			ServiceID:     chat.ChatId,
 			AstroID:       chat.AstroID,
@@ -452,9 +412,12 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 			Conversation:  chat.Conversation,
 			RatePerMinute: chat.RatePerMinute,
 			Type:          "chat",
-			ReportID:      reportID,
+			LastStatus:    chat.LastStatus,
 		}
 	case "ivrCall":
+		// Collection: ivrCall
+		// Field mapping: orderId → ivrId
+		log.Printf("Querying 'ivrCall' collection with orderId as ivrId: %s", orderId)
 		ivr, err := s.serviceRepo.FindIvrByIvrID(ctx, orderId)
 		if err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
@@ -472,9 +435,12 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 			URL:           ivr.URL,
 			RatePerMinute: ivr.RatePerMinute,
 			Type:          "ivr",
-			ReportID:      reportID,
+			LastStatus:    ivr.LastStatus,
 		}
 	case "videoCall":
+		// Collection: videoCall
+		// Field mapping: orderId → videoId
+		log.Printf("Querying 'videoCall' collection with orderId as videoId: %s", orderId)
 		video, err := s.serviceRepo.FindVideoByVideoID(ctx, orderId)
 		if err != nil {
 			if errors.Is(err, mongo.ErrNoDocuments) {
@@ -489,7 +455,7 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 			URL:           video.URL,
 			RatePerMinute: video.RatePerMinute,
 			Type:          "video",
-			ReportID:      reportID,
+			LastStatus:    video.LastStatus,
 		}
 	default:
 		return nil, fmt.Errorf("invalid service type: %s", serviceType)

@@ -79,6 +79,7 @@ type ServiceData struct {
 	RatePerMinute float64       `json:"ratePerMinute"`
 	Type          string        `json:"type"`
 	ReportID      string        `json:"reportId"`
+	LastStatus    string        `json:"lastStatus"`
 }
 
 // AcceptRejectRequest represents accept/reject complaint request
