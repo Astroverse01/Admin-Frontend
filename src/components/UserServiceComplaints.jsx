@@ -269,7 +269,7 @@ const UserServiceComplaints = () => {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[280px]">
                       Order ID
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -308,7 +308,7 @@ const UserServiceComplaints = () => {
                         <td className="px-4 py-4 text-sm text-gray-900">
                           <button
                             onClick={() => handleOrderIdClick(complaint.orderId, complaint.serviceType)}
-                            className="max-w-[150px] truncate text-primary-600 hover:text-primary-800 hover:underline cursor-pointer"
+                            className="text-primary-600 hover:text-primary-800 hover:underline cursor-pointer whitespace-nowrap font-mono text-xs"
                             title={`Click to view details: ${complaint.orderId}`}
                           >
                             {complaint.orderId}
