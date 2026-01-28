@@ -106,7 +106,7 @@ func (s *UserService) ListUsers(ctx context.Context, name string, sort string, p
 	var userData []dto.UserData
 	for _, user := range users {
 		status := "active"
-		if user.IsDelete == 1 {
+		if user.IsDeleted == 1 {
 			status = "inactive"
 		}
 
@@ -150,15 +150,15 @@ func (s *UserService) ListUsers(ctx context.Context, name string, sort string, p
 }
 
 func (s *UserService) DeactivateUser(ctx context.Context, userID string, status string) error {
-	var isDelete int
+	var isDeleted int
 	if status == "inactive" {
-		isDelete = 1
+		isDeleted = 1
 	} else {
-		isDelete = 0
+		isDeleted = 0
 	}
 
 	update := map[string]interface{}{
-		"isDelete": isDelete,
+		"isDeleted": isDeleted,
 	}
 
 	return s.userRepo.UpdateByUserID(ctx, userID, update)
@@ -205,7 +205,7 @@ func (s *AstroService) ListAstros(ctx context.Context, name string, sort string,
 	var astroData []dto.AstroData
 	for _, astro := range astros {
 		status := "active"
-		if astro.IsDelete == 1 {
+		if astro.IsDeleted == 1 {
 			status = "inactive"
 		}
 
@@ -251,20 +251,20 @@ func (s *AstroService) ListAstros(ctx context.Context, name string, sort string,
 }
 
 func (s *AstroService) UpdateAstroStatus(ctx context.Context, astroID string, status string) error {
-	var isDelete, isActive int
+	var isDeleted, isActive int
 	if status == "inactive" {
-		// When deactivating: set isDelete=1 and isActive=0 (status=inactive, visibility=hidden)
-		isDelete = 1
+		// When deactivating: set isDeleted=1 and isActive=0 (status=inactive, visibility=hidden)
+		isDeleted = 1
 		isActive = 0
 	} else {
-		// When activating: set isDelete=0 and isActive=1 (status=active, visibility=visible)
-		isDelete = 0
+		// When activating: set isDeleted=0 and isActive=1 (status=active, visibility=visible)
+		isDeleted = 0
 		isActive = 1
 	}
 
 	update := map[string]interface{}{
-		"isDelete": isDelete,
-		"isActive": isActive,
+		"isDeleted": isDeleted,
+		"isActive":  isActive,
 	}
 
 	return s.astroRepo.UpdateByAstroID(ctx, astroID, update)

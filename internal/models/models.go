@@ -13,7 +13,7 @@ type User struct {
 	Name        string             `bson:"name,omitempty" json:"name"`
 	FullName    string             `bson:"fullName,omitempty" json:"-"`
 	Email       string             `bson:"email" json:"email"`
-	IsDelete    int                `bson:"isDelete" json:"isDelete"`
+	IsDeleted   int                `bson:"isDeleted" json:"isDeleted"`
 	TotalAmount float64            `bson:"totalAmount" json:"totalAmount"`
 	FCMToken    string             `bson:"fcmToken" json:"fcmToken"`
 	Platform    string             `bson:"platform" json:"platform"`
@@ -28,7 +28,7 @@ type Astrologer struct {
 	Name        string             `bson:"name,omitempty" json:"name"`
 	FullName    string             `bson:"fullName,omitempty" json:"-"`
 	Email       string             `bson:"email" json:"email"`
-	IsDelete    int                `bson:"isDelete" json:"isDelete"`
+	IsDeleted   int                `bson:"isDeleted" json:"isDeleted"`
 	IsActive    int                `bson:"isActive" json:"isActive"`
 	TotalEarned float64            `bson:"totalEarned" json:"totalEarned"`
 	FCMToken    string             `bson:"fcmToken" json:"fcmToken"`
