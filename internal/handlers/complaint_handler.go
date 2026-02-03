@@ -83,6 +83,10 @@ func (h *ComplaintHandler) AcceptRejectComplaint(c *gin.Context) {
 		return
 	}
 
+	// Optional query params; when omitted, service uses complaint's userId/astroId
+	userId := c.Query("userId")
+	astroId := c.Query("astroId")
+
 	var req dto.AcceptRejectRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
@@ -102,8 +106,8 @@ func (h *ComplaintHandler) AcceptRejectComplaint(c *gin.Context) {
 		return
 	}
 
-	// Call service
-	response, err := h.complaintService.AcceptRejectComplaint(c.Request.Context(), orderId, &req)
+	// Call service (userId/astroId from complaint when not provided)
+	response, err := h.complaintService.AcceptRejectComplaint(c.Request.Context(), orderId, userId, astroId, &req)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Success: false,

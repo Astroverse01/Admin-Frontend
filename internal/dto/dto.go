@@ -80,15 +80,19 @@ type ServiceData struct {
 	Type          string        `json:"type"`
 	ReportID      string        `json:"reportId"`
 	LastStatus    string        `json:"lastStatus"`
+	SpendMoney    float64       `json:"spendMoney"`
+	SpendTime     float64       `json:"spendTime"`
 }
 
 // AcceptRejectRequest represents accept/reject complaint request
 type AcceptRejectRequest struct {
-	Action          string  `json:"action" validate:"required,oneof=accept reject"`
-	Reason          string  `json:"reason" validate:"required"`
-	AstroRefundMoney float64 `json:"astroRefundMoney"`
-	UserRefundMoney  float64 `json:"userRefundMoney"`
-	LegitimateTime  int     `json:"legitimateTime,omitempty"`
+	Action            string  `json:"action" validate:"required,oneof=accept reject"`
+	Reason            string  `json:"reason" validate:"required"`
+	AstroRefundMoney  float64 `json:"astroRefundMoney,omitempty"`
+	UserRefundMoney   float64 `json:"userRefundMoney,omitempty"`
+	LegitimateTime    int     `json:"legitimateTime,omitempty"`
+	SpendMoney        float64 `json:"spendMoney,omitempty"`
+	SpendTime         float64 `json:"spendTime,omitempty"`
 }
 
 // AcceptRejectResponse represents accept/reject response
@@ -229,9 +233,9 @@ type GenerateReportRequest struct {
 
 // CSVFileInfo represents information about a generated CSV file
 type CSVFileInfo struct {
-	Collection string `json:"collection"`
-	FileName   string `json:"fileName"`
-	RecordCount int   `json:"recordCount"`
+	Collection  string `json:"collection"`
+	FileName    string `json:"fileName"`
+	RecordCount int    `json:"recordCount"`
 }
 
 // GenerateReportResponse represents report generation response
@@ -243,16 +247,16 @@ type GenerateReportResponse struct {
 
 // DashboardMetricsResponse represents dashboard metrics response
 type DashboardMetricsResponse struct {
-	Success bool              `json:"success"`
-	Data    DashboardMetrics  `json:"data"`
+	Success bool             `json:"success"`
+	Data    DashboardMetrics `json:"data"`
 }
 
 // DashboardMetrics represents daily metrics for all services
 type DashboardMetrics struct {
-	Date     string           `json:"date"`
-	Chat     ServiceMetrics   `json:"chat"`
-	IvrCall  ServiceMetrics   `json:"ivrCall"`
-	VideoCall ServiceMetrics  `json:"videoCall"`
+	Date      string         `json:"date"`
+	Chat      ServiceMetrics `json:"chat"`
+	IvrCall   ServiceMetrics `json:"ivrCall"`
+	VideoCall ServiceMetrics `json:"videoCall"`
 }
 
 // ServiceMetrics represents metrics grouped by lastStatus

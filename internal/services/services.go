@@ -405,6 +405,9 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 			}
 			return nil, fmt.Errorf("failed to find chat service: %w", err)
 		}
+		if chat.LastStatus != "issue" {
+			return nil, fmt.Errorf("complaint details are only available when service lastStatus is issue, got: %s", chat.LastStatus)
+		}
 		serviceData = dto.ServiceData{
 			ServiceID:     chat.ChatId,
 			AstroID:       chat.AstroID,
@@ -413,6 +416,8 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 			RatePerMinute: chat.RatePerMinute,
 			Type:          "chat",
 			LastStatus:    chat.LastStatus,
+			SpendMoney:    chat.SpendMoney,
+			SpendTime:     chat.SpendTime,
 		}
 	case "ivrCall":
 		// Collection: ivrCall
@@ -428,6 +433,9 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 		if ivr.URL == "" {
 			return nil, fmt.Errorf("audio is not available for this orderId")
 		}
+		if ivr.LastStatus != "issue" {
+			return nil, fmt.Errorf("complaint details are only available when service lastStatus is issue, got: %s", ivr.LastStatus)
+		}
 		serviceData = dto.ServiceData{
 			ServiceID:     ivr.IvrID,
 			AstroID:       ivr.AstroID,
@@ -436,6 +444,8 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 			RatePerMinute: ivr.RatePerMinute,
 			Type:          "ivr",
 			LastStatus:    ivr.LastStatus,
+			SpendMoney:    ivr.SpendMoney,
+			SpendTime:     ivr.SpendTime,
 		}
 	case "videoCall":
 		// Collection: videoCall
@@ -448,6 +458,9 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 			}
 			return nil, fmt.Errorf("failed to find video service: %w", err)
 		}
+		if video.LastStatus != "issue" {
+			return nil, fmt.Errorf("complaint details are only available when service lastStatus is issue, got: %s", video.LastStatus)
+		}
 		serviceData = dto.ServiceData{
 			ServiceID:     video.VideoID,
 			AstroID:       video.AstroID,
@@ -456,6 +469,8 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 			RatePerMinute: video.RatePerMinute,
 			Type:          "video",
 			LastStatus:    video.LastStatus,
+			SpendMoney:    video.SpendMoney,
+			SpendTime:     video.SpendTime,
 		}
 	default:
 		return nil, fmt.Errorf("invalid service type: %s", serviceType)
@@ -467,36 +482,92 @@ func (s *ComplaintService) GetComplaintDetails(ctx context.Context, serviceType,
 	}, nil
 }
 
-func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId string, req *dto.AcceptRejectRequest) (*dto.AcceptRejectResponse, error) {
+func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId string, userIdParam, astroIdParam string, req *dto.AcceptRejectRequest) (*dto.AcceptRejectResponse, error) {
+	log.Printf("[AcceptRejectComplaint] orderId=%s action=%s userRefund=%.2f astroRefund=%.2f", orderId, req.Action, req.UserRefundMoney, req.AstroRefundMoney)
+
 	// Get complaint details by orderId
 	complaint, err := s.serviceReportRepo.FindByOrderID(ctx, orderId)
 	if err != nil {
+		log.Printf("[AcceptRejectComplaint] Error finding complaint for orderId=%s: %v", orderId, err)
 		return nil, fmt.Errorf("failed to find complaint: %w", err)
 	}
+	log.Printf("[AcceptRejectComplaint] Found complaint serviceType=%s status=%s userId=%s astroId=%s", complaint.ServiceType, complaint.Status, complaint.UserID, complaint.AstroID)
 
 	if req.Action == "accept" {
 		// Check if status is "open"
 		if complaint.Status != "open" {
+			log.Printf("[AcceptRejectComplaint] Rejected: complaint status is %s, not open", complaint.Status)
 			return nil, fmt.Errorf("complaint status is not open, cannot accept")
 		}
 
+		// When refund amounts are provided, validate params match complaint
+		if req.UserRefundMoney != 0 || req.AstroRefundMoney != 0 {
+			if userIdParam != "" && userIdParam != complaint.UserID {
+				return nil, fmt.Errorf("userId param does not match complaint user")
+			}
+			if astroIdParam != "" && astroIdParam != complaint.AstroID {
+				return nil, fmt.Errorf("astroId param does not match complaint astrologer")
+			}
+		}
+
+		// Use param userId/astroId when provided, else fall back to complaint
+		userId := complaint.UserID
+		if userIdParam != "" {
+			userId = userIdParam
+		}
+		astroId := complaint.AstroID
+		if astroIdParam != "" {
+			astroId = astroIdParam
+		}
+
+		// Validation: userRefundMoney and astroRefundMoney cannot be below 0
+		if req.UserRefundMoney < 0 || req.AstroRefundMoney < 0 {
+			return nil, fmt.Errorf("userRefundMoney and astroRefundMoney cannot be below 0")
+		}
+
+		// When any refund amount is set, validate against spendMoney from request body
+		if req.UserRefundMoney > 0 || req.AstroRefundMoney > 0 {
+			log.Printf("[AcceptRejectComplaint] Validating refund amounts against request spendMoney=%.2f", req.SpendMoney)
+			if req.SpendMoney <= 0 {
+				return nil, fmt.Errorf("spendMoney is required in request body when providing refund amounts")
+			}
+			// a) each refund must not exceed spendMoney
+			if req.UserRefundMoney > req.SpendMoney {
+				return nil, fmt.Errorf("userRefundMoney must not exceed spendMoney (%.2f)", req.SpendMoney)
+			}
+			if req.AstroRefundMoney > req.SpendMoney {
+				return nil, fmt.Errorf("astroRefundMoney must not exceed spendMoney (%.2f)", req.SpendMoney)
+			}
+			// b) sum of refunds must not exceed spendMoney
+			if req.UserRefundMoney+req.AstroRefundMoney > req.SpendMoney {
+				return nil, fmt.Errorf("userRefundMoney + astroRefundMoney must not exceed spendMoney (%.2f)", req.SpendMoney)
+			}
+			// c) sum of refunds must equal spendMoney
+			sumRefunds := req.UserRefundMoney + req.AstroRefundMoney
+			if math.Abs(sumRefunds-req.SpendMoney) > 0.01 {
+				return nil, fmt.Errorf("sum of UserRefundMoney and AstroRefundMoney doesn't match the spendMoney value")
+			}
+		}
+
 		// Update serviceReports status to "closed"
+		log.Printf("[AcceptRejectComplaint] Updating complaint status to closed")
 		err = s.serviceReportRepo.UpdateByOrderID(ctx, orderId, map[string]interface{}{
 			"status": "closed",
 			"reason": req.Reason,
 		})
 		if err != nil {
+			log.Printf("[AcceptRejectComplaint] Error updating complaint status: %v", err)
 			return nil, fmt.Errorf("failed to update complaint status: %w", err)
 		}
 
-		// Update user: totalAmount += userRefundMoney (only if userRefundMoney > 0)
+		// Update user: totalAmount += userRefundMoney (when userRefundMoney > 0)
 		if req.UserRefundMoney > 0 {
-			user, err := s.userRepo.FindByUserID(ctx, complaint.UserID)
+			log.Printf("[AcceptRejectComplaint] Updating user %s totalAmount +%.2f", userId, req.UserRefundMoney)
+			user, err := s.userRepo.FindByUserID(ctx, userId)
 			if err != nil {
 				return nil, fmt.Errorf("failed to find user: %w", err)
 			}
-
-			err = s.userRepo.UpdateByUserID(ctx, complaint.UserID, map[string]interface{}{
+			err = s.userRepo.UpdateByUserID(ctx, userId, map[string]interface{}{
 				"totalAmount": user.TotalAmount + req.UserRefundMoney,
 			})
 			if err != nil {
@@ -504,21 +575,81 @@ func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId st
 			}
 		}
 
-		// Update astrologer: totalEarned += astroRefundMoney (only if astroRefundMoney > 0)
+		// Update astrologer: balance += astroRefundMoney, totalEarned += astroRefundMoney (when astroRefundMoney > 0)
 		if req.AstroRefundMoney > 0 {
-			astro, err := s.astroRepo.FindByAstroID(ctx, complaint.AstroID)
+			log.Printf("[AcceptRejectComplaint] Updating astro %s totalEarned/balance +%.2f", astroId, req.AstroRefundMoney)
+			astro, err := s.astroRepo.FindByAstroID(ctx, astroId)
 			if err != nil {
 				return nil, fmt.Errorf("failed to find astrologer: %w", err)
 			}
-
-			err = s.astroRepo.UpdateByAstroID(ctx, complaint.AstroID, map[string]interface{}{
+			updateFields := map[string]interface{}{
 				"totalEarned": astro.TotalEarned + req.AstroRefundMoney,
-			})
+			}
+			updateFields["balance"] = astro.Balance + req.AstroRefundMoney
+			err = s.astroRepo.UpdateByAstroID(ctx, astroId, updateFields)
 			if err != nil {
-				return nil, fmt.Errorf("failed to update astrologer totalEarned: %w", err)
+				return nil, fmt.Errorf("failed to update astrologer: %w", err)
 			}
 		}
 
+		// Update spendMoney, spendTime and paymentReceived in the service collection (chat/ivrCall/videoCall) when provided
+		if req.SpendMoney != 0 || req.SpendTime != 0 {
+			log.Printf("[AcceptRejectComplaint] Updating service record spendMoney=%.2f spendTime=%.2f", req.SpendMoney, req.SpendTime)
+			updatePayload := make(map[string]interface{})
+			if req.SpendMoney != 0 {
+				updatePayload["spendMoney"] = req.SpendMoney
+			}
+			if req.SpendTime != 0 {
+				updatePayload["spendTime"] = req.SpendTime
+			}
+			updatePayload["paymentReceived"] = 1
+			if len(updatePayload) > 0 {
+				switch complaint.ServiceType {
+				case "chat":
+					if err := s.serviceRepo.UpdateChatByChatID(ctx, orderId, updatePayload); err != nil {
+						return nil, fmt.Errorf("failed to update chat spendMoney/spendTime: %w", err)
+					}
+				case "ivrCall":
+					if err := s.serviceRepo.UpdateIvrByIvrID(ctx, orderId, updatePayload); err != nil {
+						return nil, fmt.Errorf("failed to update ivrCall spendMoney/spendTime: %w", err)
+					}
+				case "videoCall":
+					if err := s.serviceRepo.UpdateVideoByVideoID(ctx, orderId, updatePayload); err != nil {
+						return nil, fmt.Errorf("failed to update videoCall spendMoney/spendTime: %w", err)
+					}
+				}
+			}
+		}
+
+		// Fetch user and astro for email notifications (refund details)
+		log.Printf("[AcceptRejectComplaint] Sending accept/refund emails to user and astro")
+		user, err := s.userRepo.FindByUserID(ctx, complaint.UserID)
+		if err != nil {
+			log.Printf("Warning: Failed to fetch user for email notification: %v", err)
+		}
+		astro, err := s.astroRepo.FindByAstroID(ctx, complaint.AstroID)
+		if err != nil {
+			log.Printf("Warning: Failed to fetch astro for email notification: %v", err)
+		}
+
+		emailClosing := "Thank you for using our service. We are here to help you in the best way we can."
+
+		if user != nil && user.Email != "" {
+			userSubject := "Complaint Accepted – Refund Processed"
+			userBody := fmt.Sprintf("Dear %s,\n\nYour complaint (Order ID: %s) has been accepted.\n\nRefund amount credited to you: %.2f\n\nReason: %s\n\n%s", user.Name, complaint.OrderID, req.UserRefundMoney, req.Reason, emailClosing)
+			if err := s.emailService.SendNotificationEmail(user.Email, userSubject, userBody); err != nil {
+				log.Printf("Warning: Failed to send email notification to user %s: %v", user.Email, err)
+			}
+		}
+		if astro != nil && astro.Email != "" {
+			astroSubject := "Complaint Accepted – Refund Processed"
+			astroBody := fmt.Sprintf("Dear %s,\n\nA complaint (Order ID: %s) has been accepted.\n\nRefund amount credited to you: %.2f\n\nReason: %s\n\n%s", astro.Name, complaint.OrderID, req.AstroRefundMoney, req.Reason, emailClosing)
+			if err := s.emailService.SendNotificationEmail(astro.Email, astroSubject, astroBody); err != nil {
+				log.Printf("Warning: Failed to send email notification to astro %s: %v", astro.Email, err)
+			}
+		}
+
+		log.Printf("[AcceptRejectComplaint] Complaint accepted successfully orderId=%s", orderId)
 		return &dto.AcceptRejectResponse{
 			Success:        true,
 			Message:        "Complaint accepted successfully",
@@ -529,15 +660,18 @@ func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId st
 		}, nil
 	} else {
 		// Reject complaint - Update serviceReports → status = "rejected"
+		log.Printf("[AcceptRejectComplaint] Rejecting complaint orderId=%s", orderId)
 		err = s.serviceReportRepo.UpdateByOrderID(ctx, orderId, map[string]interface{}{
 			"status": "rejected",
 			"reason": req.Reason,
 		})
 		if err != nil {
+			log.Printf("[AcceptRejectComplaint] Error updating complaint status to rejected: %v", err)
 			return nil, fmt.Errorf("failed to update complaint status: %w", err)
 		}
 
 		// Fetch user and astro for email notifications
+		log.Printf("[AcceptRejectComplaint] Sending reject emails to user and astro")
 		user, err := s.userRepo.FindByUserID(ctx, complaint.UserID)
 		if err != nil {
 			log.Printf("Warning: Failed to fetch user for email notification: %v", err)
@@ -549,9 +683,10 @@ func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId st
 		}
 
 		// Send email notifications to both user and astro
+		emailClosing := "Thank you for using our service. We are here to help you in the best way we can."
 		if user != nil && user.Email != "" {
 			userSubject := "Complaint Rejected"
-			userBody := fmt.Sprintf("Dear %s,\n\nYour complaint (Order ID: %s) has been rejected.\n\nReason: %s\n\nThank you for your understanding.", user.Name, complaint.OrderID, req.Reason)
+			userBody := fmt.Sprintf("Dear %s,\n\nYour complaint (Order ID: %s) has been rejected.\n\nReason: %s\n\n%s", user.Name, complaint.OrderID, req.Reason, emailClosing)
 			if err := s.emailService.SendNotificationEmail(user.Email, userSubject, userBody); err != nil {
 				log.Printf("Warning: Failed to send email notification to user %s: %v", user.Email, err)
 			}
@@ -559,12 +694,13 @@ func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId st
 
 		if astro != nil && astro.Email != "" {
 			astroSubject := "Complaint Rejected"
-			astroBody := fmt.Sprintf("Dear %s,\n\nA complaint (Order ID: %s) has been rejected.\n\nReason: %s\n\nThank you.", astro.Name, complaint.OrderID, req.Reason)
+			astroBody := fmt.Sprintf("Dear %s,\n\nA complaint (Order ID: %s) has been rejected.\n\nReason: %s\n\n%s", astro.Name, complaint.OrderID, req.Reason, emailClosing)
 			if err := s.emailService.SendNotificationEmail(astro.Email, astroSubject, astroBody); err != nil {
 				log.Printf("Warning: Failed to send email notification to astro %s: %v", astro.Email, err)
 			}
 		}
 
+		log.Printf("[AcceptRejectComplaint] Complaint rejected successfully orderId=%s", orderId)
 		return &dto.AcceptRejectResponse{
 			Success:     true,
 			Message:     "Complaint rejected",

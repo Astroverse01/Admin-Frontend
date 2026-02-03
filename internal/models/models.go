@@ -30,6 +30,7 @@ type Astrologer struct {
 	Email       string             `bson:"email" json:"email"`
 	IsDeleted   int                `bson:"isDeleted" json:"isDeleted"`
 	IsActive    int                `bson:"isActive" json:"isActive"`
+	Balance     float64            `bson:"balance" json:"balance"`
 	TotalEarned float64            `bson:"totalEarned" json:"totalEarned"`
 	FCMToken    string             `bson:"fcmToken" json:"fcmToken"`
 	Platform    string             `bson:"platform" json:"platform"`
@@ -102,6 +103,7 @@ type Chat struct {
 	Conversation    []interface{}      `bson:"conversation" json:"conversation"`
 	RatePerMinute   float64            `bson:"ratePerMinute" json:"ratePerMinute"`
 	SpendMoney      float64            `bson:"spendMoney" json:"spendMoney"`
+	SpendTime       float64            `bson:"spendTime" json:"spendTime"`
 	PaymentReceived int                `bson:"paymentReceived" json:"paymentReceived"`
 	LastStatus      string             `bson:"lastStatus" json:"lastStatus"`
 	CreatedOn       time.Time          `bson:"createdOn" json:"createdOn"`
@@ -117,6 +119,7 @@ type IvrCall struct {
 	UserUrl         string             `bson:"userUrl" json:"userUrl"`
 	RatePerMinute   float64            `bson:"ratePerMinute" json:"ratePerMinute"`
 	SpendMoney      float64            `bson:"spendMoney" json:"spendMoney"`
+	SpendTime       float64            `bson:"spendTime" json:"spendTime"`
 	PaymentReceived int                `bson:"paymentReceived" json:"paymentReceived"`
 	LastStatus      string             `bson:"lastStatus" json:"lastStatus"`
 	CreatedOn       time.Time          `bson:"createdOn" json:"createdOn"`
@@ -131,6 +134,7 @@ type VideoCall struct {
 	URL             string             `bson:"url" json:"url"`
 	RatePerMinute   float64            `bson:"ratePerMinute" json:"ratePerMinute"`
 	SpendMoney      float64            `bson:"spendMoney" json:"spendMoney"`
+	SpendTime       float64            `bson:"spendTime" json:"spendTime"`
 	PaymentReceived int                `bson:"paymentReceived" json:"paymentReceived"`
 	LastStatus      string             `bson:"lastStatus" json:"lastStatus"`
 	CreatedOn       time.Time          `bson:"createdOn" json:"createdOn"`
