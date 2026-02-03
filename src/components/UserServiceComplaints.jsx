@@ -25,8 +25,30 @@ const UserServiceComplaints = () => {
         serviceType: filters.serviceType || undefined,
         status: filters.status || undefined,
       });
-      setComplaints(response.data || []);
+      const data = response.data || [];
+      setComplaints(data);
       setPagination(response.pagination || pagination);
+      // Hydrate refundAmounts from API so spent/refund values persist after accept and on refresh
+      setRefundAmounts((prev) => {
+        const next = { ...prev };
+        data.forEach((c) => {
+          const orderId = c.orderId;
+          const spentMoney = c.spendMoney ?? c.spentMoney;
+          const spentTime = c.spendTime ?? c.spentTime;
+          const userRefund = c.userRefundMoney;
+          const astroRefund = c.astroRefundMoney;
+          if (orderId && (spentMoney !== undefined || spentTime !== undefined || userRefund !== undefined || astroRefund !== undefined)) {
+            next[orderId] = {
+              ...next[orderId],
+              spendMoney: spentMoney !== undefined ? spentMoney : next[orderId]?.spendMoney,
+              spendTime: spentTime !== undefined ? spentTime : next[orderId]?.spendTime,
+              userRefundMoney: userRefund !== undefined ? userRefund : next[orderId]?.userRefundMoney,
+              astroRefundMoney: astroRefund !== undefined ? astroRefund : next[orderId]?.astroRefundMoney,
+            };
+          }
+        });
+        return next;
+      });
     } catch (error) {
       console.error('Error fetching complaints:', error);
     } finally {
@@ -122,11 +144,8 @@ const UserServiceComplaints = () => {
         astroRefundMoney: astroRefund,
       });
       alert('Complaint accepted successfully');
-      fetchComplaints();
-      // Clear refund amounts for this order
-      const newRefunds = { ...refundAmounts };
-      delete newRefunds[orderId];
-      setRefundAmounts(newRefunds);
+      await fetchComplaints();
+      // Keep refundAmounts for this order so values remain visible (fetchComplaints hydrates from API)
     } catch (error) {
       console.error('Error accepting complaint:', error);
       alert(error.response?.data?.message || 'Failed to accept complaint');
