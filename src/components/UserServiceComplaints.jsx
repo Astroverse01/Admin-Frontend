@@ -39,26 +39,69 @@ const UserServiceComplaints = () => {
   }, [pagination.page, pagination.limit, filters]);
 
   const handleRefundChange = (orderId, field, value) => {
-    // Only allow non-negative integers
-    const numValue = parseInt(value);
-    if (value === '' || (numValue >= 0 && !isNaN(numValue))) {
-      setRefundAmounts({
-        ...refundAmounts,
+    if (value === '') {
+      setRefundAmounts((prev) => ({
+        ...prev,
         [orderId]: {
-          ...refundAmounts[orderId],
-          [field]: value === '' ? 0 : numValue,
+          ...prev[orderId],
+          [field]: field === 'spendTime' ? '' : 0,
         },
-      });
+      }));
+      return;
+    }
+    const numValue = field === 'spendTime' ? parseFloat(value, 10) : parseInt(value, 10);
+    const valid = !isNaN(numValue) && numValue >= 0;
+    if (valid) {
+      setRefundAmounts((prev) => ({
+        ...prev,
+        [orderId]: {
+          ...prev[orderId],
+          [field]: numValue,
+        },
+      }));
     }
   };
 
   const handleAccept = async (orderId) => {
-    const userRefund = refundAmounts[orderId]?.userRefundMoney || 0;
-    const astroRefund = refundAmounts[orderId]?.astroRefundMoney || 0;
+    const spendMoney = refundAmounts[orderId]?.spendMoney ?? '';
+    const spendTime = refundAmounts[orderId]?.spendTime ?? '';
+    const userRefund = refundAmounts[orderId]?.userRefundMoney ?? 0;
+    const astroRefund = refundAmounts[orderId]?.astroRefundMoney ?? 0;
 
-    // Validate that values are non-negative integers
+    // Spend money and time are required when accepting
+    if (spendMoney === '' || spendMoney === undefined || Number(spendMoney) < 0) {
+      alert('Spend Money (₹) is required and must be a non-negative number');
+      return;
+    }
+    if (spendTime === '' || spendTime === undefined || Number(spendTime) < 0 || isNaN(Number(spendTime))) {
+      alert('Spend Time is required and must be a non-negative number (e.g. minutes)');
+      return;
+    }
+
+    const spendMoneyNum = Number(spendMoney);
+    const spendTimeNum = Number(spendTime);
+
+    // Refund amounts must be non-negative
     if (userRefund < 0 || astroRefund < 0) {
       alert('Refund amounts cannot be negative');
+      return;
+    }
+
+    // User Refund validation: cannot exceed spend money
+    if (userRefund > spendMoneyNum) {
+      alert('User Refund cannot exceed Spend Money (₹)');
+      return;
+    }
+
+    // Astro Refund validation: cannot exceed spend money
+    if (astroRefund > spendMoneyNum) {
+      alert('Astro Refund cannot exceed Spend Money (₹)');
+      return;
+    }
+
+    // Total refunds cannot exceed spend money
+    if (userRefund + astroRefund > spendMoneyNum) {
+      alert('User Refund + Astro Refund cannot exceed Spend Money (₹)');
       return;
     }
 
@@ -73,6 +116,8 @@ const UserServiceComplaints = () => {
       await complaintsAPI.acceptRejectComplaint(orderId, {
         action: 'accept',
         reason: reason.trim(),
+        spendMoney: spendMoneyNum,
+        spendTime: spendTimeNum,
         userRefundMoney: userRefund,
         astroRefundMoney: astroRefund,
       });
@@ -102,6 +147,8 @@ const UserServiceComplaints = () => {
       await complaintsAPI.acceptRejectComplaint(orderId, {
         action: 'reject',
         reason: reason.trim(),
+        spendMoney: 0,
+        spendTime: 0,
         userRefundMoney: 0,
         astroRefundMoney: 0,
       });
@@ -133,7 +180,7 @@ const UserServiceComplaints = () => {
     const normalized = serviceType.toLowerCase();
     const mapping = {
       'chat': 'chat',      // chat stays as chat
-      'call': 'ivrCall',   // call maps to ivrCall for the API
+      'ivr': 'ivrCall',   // ivr maps to ivrCall for the API
       'video': 'videoCall', // video maps to videoCall for the API
     };
     return mapping[normalized] || normalized;
@@ -288,6 +335,12 @@ const UserServiceComplaints = () => {
                       Created At
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Spend Money (₹)
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Spend Time
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       User Refund (₹)
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -350,7 +403,33 @@ const UserServiceComplaints = () => {
                             type="number"
                             min="0"
                             step="1"
-                            value={refundAmounts[complaint.orderId]?.userRefundMoney || ''}
+                            value={refundAmounts[complaint.orderId]?.spendMoney ?? ''}
+                            onChange={(e) => handleRefundChange(complaint.orderId, 'spendMoney', e.target.value)}
+                            disabled={!isOpen || isLoading}
+                            placeholder="0"
+                            title="Spend Money (₹)"
+                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={refundAmounts[complaint.orderId]?.spendTime ?? ''}
+                            onChange={(e) => handleRefundChange(complaint.orderId, 'spendTime', e.target.value)}
+                            disabled={!isOpen || isLoading}
+                            placeholder="0"
+                            title="Spend Time (e.g. minutes)"
+                            className="w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          />
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={refundAmounts[complaint.orderId]?.userRefundMoney ?? ''}
                             onChange={(e) => handleRefundChange(complaint.orderId, 'userRefundMoney', e.target.value)}
                             disabled={!isOpen || isLoading}
                             placeholder="0"
@@ -362,7 +441,7 @@ const UserServiceComplaints = () => {
                             type="number"
                             min="0"
                             step="1"
-                            value={refundAmounts[complaint.orderId]?.astroRefundMoney || ''}
+                            value={refundAmounts[complaint.orderId]?.astroRefundMoney ?? ''}
                             onChange={(e) => handleRefundChange(complaint.orderId, 'astroRefundMoney', e.target.value)}
                             disabled={!isOpen || isLoading}
                             placeholder="0"
