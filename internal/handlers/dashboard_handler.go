@@ -51,4 +51,3 @@ func (h *DashboardHandler) GetDailyMetrics(c *gin.Context) {
 
 	c.JSON(http.StatusOK, response)
 }
-

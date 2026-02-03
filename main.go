@@ -49,7 +49,7 @@ func main() {
 	astroProblemService := services.NewAstroProblemService(astroProblemRepo, astroRepo)
 	horoscopeService := services.NewHoroscopeService(horoscopeRepo)
 	schedulerService := services.NewSchedulerService(dailyReportRepo, cfg)
-	dashboardService := services.NewDashboardService(serviceRepo)
+	dashboardService := services.NewDashboardService(serviceRepo, userRepo)
 	feedbackService := services.NewFeedbackService(feedbackRepo)
 
 	// Initialize handlers

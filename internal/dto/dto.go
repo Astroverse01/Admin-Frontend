@@ -86,13 +86,13 @@ type ServiceData struct {
 
 // AcceptRejectRequest represents accept/reject complaint request
 type AcceptRejectRequest struct {
-	Action            string  `json:"action" validate:"required,oneof=accept reject"`
-	Reason            string  `json:"reason" validate:"required"`
-	AstroRefundMoney  float64 `json:"astroRefundMoney,omitempty"`
-	UserRefundMoney   float64 `json:"userRefundMoney,omitempty"`
-	LegitimateTime    int     `json:"legitimateTime,omitempty"`
-	SpendMoney        float64 `json:"spendMoney,omitempty"`
-	SpendTime         float64 `json:"spendTime,omitempty"`
+	Action           string  `json:"action" validate:"required,oneof=accept reject"`
+	Reason           string  `json:"reason" validate:"required"`
+	AstroRefundMoney float64 `json:"astroRefundMoney,omitempty"`
+	UserRefundMoney  float64 `json:"userRefundMoney,omitempty"`
+	LegitimateTime   int     `json:"legitimateTime,omitempty"`
+	SpendMoney       float64 `json:"spendMoney,omitempty"`
+	SpendTime        float64 `json:"spendTime,omitempty"`
 }
 
 // AcceptRejectResponse represents accept/reject response
@@ -251,12 +251,13 @@ type DashboardMetricsResponse struct {
 	Data    DashboardMetrics `json:"data"`
 }
 
-// DashboardMetrics represents daily metrics for all services
+// DashboardMetrics represents daily metrics for all services and users
 type DashboardMetrics struct {
-	Date      string         `json:"date"`
-	Chat      ServiceMetrics `json:"chat"`
-	IvrCall   ServiceMetrics `json:"ivrCall"`
-	VideoCall ServiceMetrics `json:"videoCall"`
+	Date              string         `json:"date"`
+	Chat              ServiceMetrics `json:"chat"`
+	IvrCall           ServiceMetrics `json:"ivrCall"`
+	VideoCall         ServiceMetrics `json:"videoCall"`
+	UsersNotPassedOTP int64          `json:"usersNotPassedOTP"` // users created on this day where isActive != 1 (couldn't pass OTP)
 }
 
 // ServiceMetrics represents metrics grouped by lastStatus

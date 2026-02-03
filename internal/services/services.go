@@ -643,7 +643,7 @@ func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId st
 		}
 		if astro != nil && astro.Email != "" {
 			astroSubject := "Complaint Accepted – Refund Processed"
-			astroBody := fmt.Sprintf("Dear %s,\n\nA complaint (Order ID: %s) has been accepted.\n\nRefund amount credited to you: %.2f\n\nReason: %s\n\n%s", astro.Name, complaint.OrderID, req.AstroRefundMoney, req.Reason, emailClosing)
+			astroBody := fmt.Sprintf("Dear %s,\n\nA Astrologer (Order ID: %s) has been accepted.\n\nComplain Refund amount credited to you: %.2f\n\nReason: %s\n\n%s", astro.Name, complaint.OrderID, req.AstroRefundMoney, req.Reason, emailClosing)
 			if err := s.emailService.SendNotificationEmail(astro.Email, astroSubject, astroBody); err != nil {
 				log.Printf("Warning: Failed to send email notification to astro %s: %v", astro.Email, err)
 			}
@@ -1093,11 +1093,13 @@ func (s *HoroscopeService) DeleteHoroscope(ctx context.Context, horoscopeID stri
 // DashboardService handles dashboard metrics logic
 type DashboardService struct {
 	serviceRepo repository.ServiceRepository
+	userRepo    repository.UserRepository
 }
 
-func NewDashboardService(serviceRepo repository.ServiceRepository) *DashboardService {
+func NewDashboardService(serviceRepo repository.ServiceRepository, userRepo repository.UserRepository) *DashboardService {
 	return &DashboardService{
 		serviceRepo: serviceRepo,
+		userRepo:    userRepo,
 	}
 }
 
@@ -1130,6 +1132,16 @@ func (s *DashboardService) GetDailyMetrics(ctx context.Context, date string) (*d
 		return nil, fmt.Errorf("failed to get videoCall metrics: %w", err)
 	}
 
+	// Count users created on this day where isActive != 1 (didn't pass OTP stage)
+	userFilter := bson.M{
+		"createdOn": bson.M{"$gte": startTime, "$lt": endTime},
+		"isActive":  bson.M{"$ne": 1},
+	}
+	usersNotPassedOTP, err := s.userRepo.Count(ctx, userFilter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user metrics: %w", err)
+	}
+
 	// Convert to ServiceMetrics DTO
 	chatServiceMetrics := s.convertToServiceMetrics(chatMetrics)
 	ivrCallServiceMetrics := s.convertToServiceMetrics(ivrCallMetrics)
@@ -1138,10 +1150,11 @@ func (s *DashboardService) GetDailyMetrics(ctx context.Context, date string) (*d
 	return &dto.DashboardMetricsResponse{
 		Success: true,
 		Data: dto.DashboardMetrics{
-			Date:      date,
-			Chat:      chatServiceMetrics,
-			IvrCall:   ivrCallServiceMetrics,
-			VideoCall: videoCallServiceMetrics,
+			Date:              date,
+			Chat:              chatServiceMetrics,
+			IvrCall:           ivrCallServiceMetrics,
+			VideoCall:         videoCallServiceMetrics,
+			UsersNotPassedOTP: usersNotPassedOTP,
 		},
 	}, nil
 }
