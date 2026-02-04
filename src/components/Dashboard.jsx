@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { dashboardAPI, usersAPI, astrosAPI, complaintsAPI, userProblemsAPI, astroProblemsAPI } from '../services/api';
-import { Users, UserCircle, MessageSquare, AlertCircle, TrendingUp, MessageCircle, Phone, Video, Calendar, ShieldOff } from 'lucide-react';
+import { Users, UserCircle, MessageSquare, AlertCircle, TrendingUp, MessageCircle, Phone, Video, Calendar, ShieldOff, UserPlus } from 'lucide-react';
 
 const todayYYYYMMDD = () => {
   const d = new Date();
@@ -21,6 +21,7 @@ const Dashboard = () => {
     chat: { failed: 0, request: 0, complete: 0, issue: 0, reject: 0, total: 0 },
     ivrCall: { failed: 0, request: 0, complete: 0, issue: 0, reject: 0, total: 0 },
     videoCall: { failed: 0, request: 0, complete: 0, issue: 0, reject: 0, total: 0 },
+    usersCreatedOnDate: 0,
     usersNotPassedOTP: 0,
   });
   const [selectedDate, setSelectedDate] = useState(todayYYYYMMDD());
@@ -74,6 +75,7 @@ const Dashboard = () => {
             chat: data.chat || { failed: 0, request: 0, complete: 0, issue: 0, reject: 0, total: 0 },
             ivrCall: data.ivrCall || { failed: 0, request: 0, complete: 0, issue: 0, reject: 0, total: 0 },
             videoCall: data.videoCall || { failed: 0, request: 0, complete: 0, issue: 0, reject: 0, total: 0 },
+            usersCreatedOnDate: data.usersCreatedOnDate ?? data.UsersCreatedOnDate ?? 0,
             usersNotPassedOTP: data.usersNotPassedOTP ?? data.usersNotPassedOtp ?? 0,
           });
         }
@@ -140,6 +142,14 @@ const Dashboard = () => {
   const displayDate = serviceMetrics.date || selectedDate;
 
   const serviceCards = [
+    {
+      title: 'Users created on date',
+      data: null,
+      icon: UserPlus,
+      color: 'bg-teal-500',
+      singleMetric: serviceMetrics.usersCreatedOnDate,
+      subtitle: 'Users registered this day',
+    },
     {
       title: 'Chat Services',
       data: serviceMetrics.chat,
