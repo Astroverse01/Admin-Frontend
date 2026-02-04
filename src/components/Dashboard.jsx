@@ -65,9 +65,10 @@ const Dashboard = () => {
     const fetchDailyMetrics = async () => {
       setMetricsLoading(true);
       try {
-        const metricsResponse = await dashboardAPI.getDailyMetrics(selectedDate);
-        if (metricsResponse.success && metricsResponse.data) {
-          const data = metricsResponse.data;
+        const response = await dashboardAPI.getDailyMetrics(selectedDate);
+        // Backend may return { success, data: { ... } } or directly { date, chat, ... }
+        const data = response?.data ?? response;
+        if (data && typeof data === 'object') {
           setServiceMetrics({
             date: data.date || selectedDate,
             chat: data.chat || { failed: 0, request: 0, complete: 0, issue: 0, reject: 0, total: 0 },
