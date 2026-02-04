@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api-admin.astrosway.com';
-
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8082';
+//'https://api-admin.astrosway.com'
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -149,10 +149,12 @@ export const schedulerAPI = {
   },
 };
 
-// Dashboard API
+// Dashboard API — pass date (YYYY-MM-DD) for daily metrics; backend defaults to today if omitted
 export const dashboardAPI = {
-  getMetrics: async () => {
-    const response = await api.get('/admin/dashboard/metrics');
+  getDailyMetrics: async (date) => {
+    const response = await api.get('/admin/dashboard/metrics', {
+      params: date ? { date } : {},
+    });
     return response.data;
   },
 };
