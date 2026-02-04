@@ -10,6 +10,7 @@ import (
 	"admin-be/internal/middleware"
 	"admin-be/internal/repository"
 	"admin-be/internal/services"
+	"admin-be/internal/utils"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -39,9 +40,17 @@ func main() {
 	serviceRepo := repository.NewServiceRepository(mongoDB)
 	feedbackRepo := repository.NewFeedbackRepository(mongoDB)
 
+	// Decryptor for user phoneNo (matches Node Encryptor: PBKDF2 + AES-256-CBC)
+	var decryptor *utils.Decryptor
+	if d, err := utils.NewDecryptor(cfg.SecretKey, cfg.IV, cfg.Salt, cfg.Iterations, cfg.Keylen); err != nil {
+		log.Printf("Warning: Could not create phone decryptor: %v. ListUsers will not return decrypted phone numbers.", err)
+	} else {
+		decryptor = d
+	}
+
 	// Initialize services
 	authService := services.NewAuthService(cfg.JWTSecret)
-	userService := services.NewUserService(userRepo)
+	userService := services.NewUserService(userRepo, decryptor)
 	astroService := services.NewAstroService(astroRepo)
 	emailService := services.NewEmailService(cfg)
 	complaintService := services.NewComplaintService(serviceReportRepo, userRepo, astroRepo, mongoDB, emailService)

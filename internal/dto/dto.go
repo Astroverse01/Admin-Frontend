@@ -22,9 +22,10 @@ type UserListResponse struct {
 
 // UserData represents user data in list response
 type UserData struct {
-	UserID string `json:"userId"`
-	Name   string `json:"name"`
-	Status string `json:"status"`
+	UserID      string `json:"userId"`
+	Name        string `json:"name"`
+	Status      string `json:"status"`
+	PhoneNumber string `json:"phoneNumber,omitempty"` // decrypted phone number
 }
 
 // AstroListResponse represents the astro list response
@@ -253,11 +254,12 @@ type DashboardMetricsResponse struct {
 
 // DashboardMetrics represents daily metrics for all services and users
 type DashboardMetrics struct {
-	Date              string         `json:"date"`
-	Chat              ServiceMetrics `json:"chat"`
-	IvrCall           ServiceMetrics `json:"ivrCall"`
-	VideoCall         ServiceMetrics `json:"videoCall"`
-	UsersNotPassedOTP int64          `json:"usersNotPassedOTP"` // users created on this day where isActive != 1 (couldn't pass OTP)
+	Date               string         `json:"date"`
+	Chat               ServiceMetrics `json:"chat"`
+	IvrCall            ServiceMetrics `json:"ivrCall"`
+	VideoCall          ServiceMetrics `json:"videoCall"`
+	UsersCreatedOnDate int64          `json:"usersCreatedOnDate"` // number of user records with createdOn on this date
+	UsersNotPassedOTP  int64          `json:"usersNotPassedOTP"`  // users created on this day where isActive != 1 (couldn't pass OTP)
 }
 
 // ServiceMetrics represents metrics grouped by lastStatus

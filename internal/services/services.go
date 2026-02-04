@@ -5,6 +5,7 @@ import (
 	"admin-be/internal/dto"
 	"admin-be/internal/models"
 	"admin-be/internal/repository"
+	"admin-be/internal/utils"
 	"context"
 	"errors"
 	"fmt"
@@ -55,12 +56,14 @@ func (s *AuthService) GenerateToken(username string) (string, error) {
 
 // UserService handles user management logic
 type UserService struct {
-	userRepo repository.UserRepository
+	userRepo  repository.UserRepository
+	decryptor *utils.Decryptor
 }
 
-func NewUserService(userRepo repository.UserRepository) *UserService {
+func NewUserService(userRepo repository.UserRepository, decryptor *utils.Decryptor) *UserService {
 	return &UserService{
-		userRepo: userRepo,
+		userRepo:  userRepo,
+		decryptor: decryptor,
 	}
 }
 
@@ -116,10 +119,20 @@ func (s *UserService) ListUsers(ctx context.Context, name string, sort string, p
 			name = user.FullName
 		}
 
+		phoneNumber := ""
+		if s.decryptor != nil && user.PhoneNo != "" {
+			if dec, err := s.decryptor.Decrypt(user.PhoneNo); err == nil {
+				phoneNumber = dec
+			} else {
+				log.Printf("[ListUsers Service] Failed to decrypt phoneNo for user %s: %v", user.UserID, err)
+			}
+		}
+
 		userData = append(userData, dto.UserData{
-			UserID: user.UserID,
-			Name:   name,
-			Status: status,
+			UserID:      user.UserID,
+			Name:        name,
+			Status:      status,
+			PhoneNumber: phoneNumber,
 		})
 	}
 	log.Printf("[ListUsers Service] Converted %d users to DTO", len(userData))
@@ -1132,6 +1145,15 @@ func (s *DashboardService) GetDailyMetrics(ctx context.Context, date string) (*d
 		return nil, fmt.Errorf("failed to get videoCall metrics: %w", err)
 	}
 
+	// Count all user records with createdOn on this date
+	usersCreatedOnFilter := bson.M{
+		"createdOn": bson.M{"$gte": startTime, "$lt": endTime},
+	}
+	usersCreatedOnDate, err := s.userRepo.Count(ctx, usersCreatedOnFilter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get users created on date: %w", err)
+	}
+
 	// Count users created on this day where isActive != 1 (didn't pass OTP stage)
 	userFilter := bson.M{
 		"createdOn": bson.M{"$gte": startTime, "$lt": endTime},
@@ -1150,11 +1172,12 @@ func (s *DashboardService) GetDailyMetrics(ctx context.Context, date string) (*d
 	return &dto.DashboardMetricsResponse{
 		Success: true,
 		Data: dto.DashboardMetrics{
-			Date:              date,
-			Chat:              chatServiceMetrics,
-			IvrCall:           ivrCallServiceMetrics,
-			VideoCall:         videoCallServiceMetrics,
-			UsersNotPassedOTP: usersNotPassedOTP,
+			Date:               date,
+			Chat:               chatServiceMetrics,
+			IvrCall:            ivrCallServiceMetrics,
+			VideoCall:          videoCallServiceMetrics,
+			UsersCreatedOnDate: usersCreatedOnDate,
+			UsersNotPassedOTP:  usersNotPassedOTP,
 		},
 	}, nil
 }

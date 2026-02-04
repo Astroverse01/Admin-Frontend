@@ -13,6 +13,7 @@ type User struct {
 	Name        string             `bson:"name,omitempty" json:"name"`
 	FullName    string             `bson:"fullName,omitempty" json:"-"`
 	Email       string             `bson:"email" json:"email"`
+	PhoneNo     string             `bson:"phoneNo,omitempty" json:"-"` // stored encrypted; use decrypted value in API
 	IsDeleted   int                `bson:"isDeleted" json:"isDeleted"`
 	TotalAmount float64            `bson:"totalAmount" json:"totalAmount"`
 	FCMToken    string             `bson:"fcmToken" json:"fcmToken"`
