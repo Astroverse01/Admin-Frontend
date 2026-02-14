@@ -40,7 +40,8 @@ const AstroGeneralComplaints = () => {
 
     setActionLoading(true);
     try {
-      await astroProblemsAPI.closeComplaint(selectedComplaint.problemId, closeReason);
+      const problemId = selectedComplaint.problemtId || selectedComplaint.problemId;
+      await astroProblemsAPI.closeComplaint(problemId, closeReason);
       setShowModal(false);
       setSelectedComplaint(null);
       setCloseReason('');
@@ -118,9 +119,9 @@ const AstroGeneralComplaints = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {complaints.map((complaint) => (
-                    <tr key={complaint.problemId} className="hover:bg-gray-50">
+                    <tr key={complaint.problemtId || complaint.problemId} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {complaint.problemId}
+                        {complaint.problemtId || complaint.problemId}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {complaint.astroId}
@@ -139,7 +140,7 @@ const AstroGeneralComplaints = () => {
                           {complaint.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                      <td className="px-6 py-4 text-sm text-gray-900 break-words min-w-[200px] max-w-md">
                         {complaint.comment}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -213,7 +214,7 @@ const AstroGeneralComplaints = () => {
               </div>
 
               <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-2">Problem ID: {selectedComplaint.problemId}</p>
+                <p className="text-sm text-gray-600 mb-2">Problem ID: {selectedComplaint.problemtId || selectedComplaint.problemId}</p>
                 <p className="text-sm text-gray-600 mb-2">Comment: {selectedComplaint.comment}</p>
               </div>
 

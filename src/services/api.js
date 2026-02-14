@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api-admin.astrosway.com';
-
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8082';
+//'https://api-admin.astrosway.com'
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -94,7 +94,10 @@ export const userProblemsAPI = {
     return response.data;
   },
   closeComplaint: async (problemId, reason) => {
-    const response = await api.patch(`/admin/user-general-complaints/${problemId}/close`, { reason });
+    const response = await api.patch(`/admin/user-general-complaints/${problemId}/close`, {
+      reason,
+      response: reason,
+    });
     return response.data;
   },
 };
@@ -106,7 +109,10 @@ export const astroProblemsAPI = {
     return response.data;
   },
   closeComplaint: async (problemId, reason) => {
-    const response = await api.patch(`/admin/astro-general-complaints/${problemId}/close`, { reason });
+    const response = await api.patch(`/admin/astro-general-complaints/${problemId}/close`, {
+      reason,
+      response: reason,
+    });
     return response.data;
   },
 };

@@ -6,19 +6,33 @@ const Users = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
-  const [filters, setFilters] = useState({ name: '', sort: 'asc' });
+  const [filters, setFilters] = useState({
+    name: '',
+    sort: 'asc',
+    updatedOnFrom: '',
+    updatedOnTo: '',
+  });
   const [actionLoading, setActionLoading] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const response = await usersAPI.listUsers({
+      const params = {
         page: pagination.page,
         limit: pagination.limit,
         name: filters.name,
         sort: filters.sort,
-      });
+      };
+      const hasDateFilter = filters.updatedOnFrom || filters.updatedOnTo;
+      if (filters.updatedOnFrom) params.updatedOnFrom = filters.updatedOnFrom;
+      if (filters.updatedOnTo) params.updatedOnTo = filters.updatedOnTo;
+      // When filtering by date range: only records between from/to, latest first
+      if (hasDateFilter) {
+        params.sortBy = 'updatedOn';
+        params.sortOrder = 'desc';
+      }
+      const response = await usersAPI.listUsers(params);
       setUsers(response.data || []);
       setPagination(response.pagination || pagination);
     } catch (error) {
@@ -99,6 +113,22 @@ const Users = () => {
             <option value="50">50 per page</option>
             <option value="100">100 per page</option>
           </select>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600 whitespace-nowrap">Updated from</label>
+            <input
+              type="date"
+              value={filters.updatedOnFrom}
+              onChange={(e) => setFilters({ ...filters, updatedOnFrom: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm"
+            />
+            <label className="text-sm text-gray-600 whitespace-nowrap">to</label>
+            <input
+              type="date"
+              value={filters.updatedOnTo}
+              onChange={(e) => setFilters({ ...filters, updatedOnTo: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none text-sm"
+            />
+          </div>
           <button
             type="submit"
             className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition"
@@ -144,6 +174,9 @@ const Users = () => {
                       Phone
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -162,6 +195,9 @@ const Users = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {user.phoneNumber ?? user.phone_number ?? '—'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {user.amount != null && user.amount !== '' ? user.amount : '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span

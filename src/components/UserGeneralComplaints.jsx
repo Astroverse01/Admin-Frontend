@@ -40,7 +40,8 @@ const UserGeneralComplaints = () => {
 
     setActionLoading(true);
     try {
-      await userProblemsAPI.closeComplaint(selectedComplaint.problemId, closeReason);
+      const problemId = selectedComplaint.problemtId || selectedComplaint.problemId;
+      await userProblemsAPI.closeComplaint(problemId, closeReason);
       setShowModal(false);
       setSelectedComplaint(null);
       setCloseReason('');
@@ -106,6 +107,9 @@ const UserGeneralComplaints = () => {
                       User Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Phone Number
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Problem Type
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -121,9 +125,9 @@ const UserGeneralComplaints = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {complaints.map((complaint) => (
-                    <tr key={complaint.problemId} className="hover:bg-gray-50">
+                    <tr key={complaint.problemtId || complaint.problemId} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {complaint.problemId}
+                        {complaint.problemtId || complaint.problemId}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {complaint.userId}
@@ -132,6 +136,9 @@ const UserGeneralComplaints = () => {
                         <div className="max-w-[150px]" title={complaint.fullName || 'N/A'}>
                           <span className="font-medium">{complaint.fullName || 'N/A'}</span>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {complaint.phoneNumber || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {complaint.problemTypes}
@@ -147,7 +154,7 @@ const UserGeneralComplaints = () => {
                           {complaint.status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                      <td className="px-6 py-4 text-sm text-gray-900 break-words min-w-[200px] max-w-md">
                         {complaint.comment}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -221,7 +228,7 @@ const UserGeneralComplaints = () => {
               </div>
 
               <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-2">Problem ID: {selectedComplaint.problemId}</p>
+                <p className="text-sm text-gray-600 mb-2">Problem ID: {selectedComplaint.problemtId || selectedComplaint.problemId}</p>
                 <p className="text-sm text-gray-600 mb-2">Comment: {selectedComplaint.comment}</p>
               </div>
 
