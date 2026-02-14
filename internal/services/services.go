@@ -56,31 +56,72 @@ func (s *AuthService) GenerateToken(username string) (string, error) {
 
 // UserService handles user management logic
 type UserService struct {
-	userRepo  repository.UserRepository
-	decryptor *utils.Decryptor
+	userRepo        repository.UserRepository
+	userPaymentRepo repository.UserPaymentRepository
+	decryptor       *utils.Decryptor
 }
 
-func NewUserService(userRepo repository.UserRepository, decryptor *utils.Decryptor) *UserService {
+func NewUserService(userRepo repository.UserRepository, userPaymentRepo repository.UserPaymentRepository, decryptor *utils.Decryptor) *UserService {
 	return &UserService{
-		userRepo:  userRepo,
-		decryptor: decryptor,
+		userRepo:        userRepo,
+		userPaymentRepo: userPaymentRepo,
+		decryptor:       decryptor,
 	}
 }
 
-func (s *UserService) ListUsers(ctx context.Context, name string, sort string, page, limit int) (*dto.UserListResponse, error) {
-	log.Printf("[ListUsers Service] Called with params - name: %s, sort: %s, page: %d, limit: %d", name, sort, page, limit)
+func (s *UserService) ListUsers(ctx context.Context, name string, sort string, page, limit int, updatedOnFrom, updatedOnTo string) (*dto.UserListResponse, error) {
+	log.Printf("[ListUsers Service] Called with params - name: %s, sort: %s, page: %d, limit: %d, updatedOnFrom: %s, updatedOnTo: %s", name, sort, page, limit, updatedOnFrom, updatedOnTo)
 
 	// Build filter
 	filter := make(map[string]interface{})
+
+	// Name filter: search in both name and fullName
+	var nameOr []bson.M
 	if name != "" {
-		// Search in both name and fullName fields
-		filter["$or"] = []bson.M{
+		nameOr = []bson.M{
 			{"name": bson.M{"$regex": regexp.QuoteMeta(name), "$options": "i"}},
 			{"fullName": bson.M{"$regex": regexp.QuoteMeta(name), "$options": "i"}},
 		}
 		log.Printf("[ListUsers Service] Built filter with name regex for both name and fullName fields")
-	} else {
-		log.Println("[ListUsers Service] No name filter, using empty filter")
+	}
+
+	// updatedOn date range (user collection has only updatedOn)
+	var dateOr []bson.M
+	if updatedOnFrom != "" || updatedOnTo != "" {
+		var startTime, endTime time.Time
+		if updatedOnFrom != "" {
+			t, _ := time.Parse("2006-01-02", updatedOnFrom)
+			startTime = time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+		}
+		if updatedOnTo != "" {
+			t, _ := time.Parse("2006-01-02", updatedOnTo)
+			endTime = time.Date(t.Year(), t.Month(), t.Day(), 23, 59, 59, 999999999, time.UTC)
+		} else if updatedOnFrom != "" {
+			endTime = time.Now().UTC().Add(24 * time.Hour)
+		}
+		dateRange := bson.M{}
+		if !startTime.IsZero() {
+			dateRange["$gte"] = startTime
+		}
+		if !endTime.IsZero() {
+			dateRange["$lte"] = endTime
+		}
+		if len(dateRange) > 0 {
+			dateOr = []bson.M{{"updatedOn": dateRange}}
+			log.Printf("[ListUsers Service] Applied updatedOn filter from %v to %v", startTime, endTime)
+		}
+	}
+
+	// Combine name and date filters
+	if len(nameOr) > 0 && len(dateOr) > 0 {
+		filter["$and"] = []bson.M{
+			{"$or": nameOr},
+			{"$or": dateOr},
+		}
+	} else if len(nameOr) > 0 {
+		filter["$or"] = nameOr
+	} else if len(dateOr) > 0 {
+		filter["$or"] = dateOr
 	}
 
 	// Calculate pagination
@@ -105,6 +146,17 @@ func (s *UserService) ListUsers(ctx context.Context, name string, sort string, p
 	}
 	log.Printf("[ListUsers Service] Total users count: %d", total)
 
+	// Fetch total amount per user from userPayment collection (one batch query)
+	userIDs := make([]string, 0, len(users))
+	for _, u := range users {
+		userIDs = append(userIDs, u.UserID)
+	}
+	amountByUserID, err := s.userPaymentRepo.SumAmountsByUserIDs(ctx, userIDs)
+	if err != nil {
+		log.Printf("[ListUsers Service] Warning: failed to fetch userPayment amounts: %v", err)
+		amountByUserID = map[string]float64{}
+	}
+
 	// Convert to DTO
 	var userData []dto.UserData
 	for _, user := range users {
@@ -120,12 +172,32 @@ func (s *UserService) ListUsers(ctx context.Context, name string, sort string, p
 		}
 
 		phoneNumber := ""
-		if s.decryptor != nil && user.PhoneNo != "" {
-			if dec, err := s.decryptor.Decrypt(user.PhoneNo); err == nil {
+		encryptedPhone := user.PhoneNo
+		if encryptedPhone == "" {
+			encryptedPhone = user.PhoneNumber
+		}
+		if s.decryptor != nil && encryptedPhone != "" {
+			if dec, err := s.decryptor.Decrypt(encryptedPhone); err == nil {
 				phoneNumber = dec
 			} else {
 				log.Printf("[ListUsers Service] Failed to decrypt phoneNo for user %s: %v", user.UserID, err)
 			}
+		}
+
+		// updatedOn from user collection
+		updatedOnStr := ""
+		if !user.UpdatedOn.IsZero() {
+			updatedOnStr = user.UpdatedOn.Format(time.RFC3339)
+		}
+
+		// amount: prefer userPayment sum; fallback to user.totalAmount when userPayment has no data
+		amt := amountByUserID[user.UserID]
+		if amt == 0 && user.TotalAmount != 0 {
+			amt = user.TotalAmount
+		}
+		amountStr := ""
+		if amt != 0 {
+			amountStr = fmt.Sprintf("%g", amt)
 		}
 
 		userData = append(userData, dto.UserData{
@@ -133,6 +205,8 @@ func (s *UserService) ListUsers(ctx context.Context, name string, sort string, p
 			Name:        name,
 			Status:      status,
 			PhoneNumber: phoneNumber,
+			UpdatedOn:   updatedOnStr,
+			Amount:      amountStr,
 		})
 	}
 	log.Printf("[ListUsers Service] Converted %d users to DTO", len(userData))
@@ -728,12 +802,14 @@ func (s *ComplaintService) AcceptRejectComplaint(ctx context.Context, orderId st
 type UserProblemService struct {
 	userProblemRepo repository.UserProblemRepository
 	userRepo        repository.UserRepository
+	decryptor       *utils.Decryptor
 }
 
-func NewUserProblemService(userProblemRepo repository.UserProblemRepository, userRepo repository.UserRepository) *UserProblemService {
+func NewUserProblemService(userProblemRepo repository.UserProblemRepository, userRepo repository.UserRepository, decryptor *utils.Decryptor) *UserProblemService {
 	return &UserProblemService{
 		userProblemRepo: userProblemRepo,
 		userRepo:        userRepo,
+		decryptor:       decryptor,
 	}
 }
 
@@ -762,20 +838,32 @@ func (s *UserProblemService) ListUserGeneralComplaints(ctx context.Context, prob
 		return nil, err
 	}
 
-	// Convert to DTO and fetch user fullName
+	// Convert to DTO and fetch user fullName and phoneNumber (decrypted)
 	var problemData []dto.ProblemData
 	for _, problem := range problems {
 		fullName := ""
+		phoneNumber := ""
 		if problem.UserID != "" {
 			user, err := s.userRepo.FindByUserID(ctx, problem.UserID)
 			if err == nil && user != nil {
 				fullName = user.FullName
+				// Encrypted value may be in phoneNo or phoneNumber field in user collection
+				encryptedPhone := user.PhoneNo
+				if encryptedPhone == "" {
+					encryptedPhone = user.PhoneNumber
+				}
+				if s.decryptor != nil && encryptedPhone != "" {
+					if dec, err := s.decryptor.Decrypt(encryptedPhone); err == nil {
+						phoneNumber = dec
+					}
+				}
 			}
 		}
 		problemData = append(problemData, dto.ProblemData{
 			ProblemID:    problem.ProblemID,
 			UserID:       problem.UserID,
 			FullName:     fullName,
+			PhoneNumber:  phoneNumber,
 			Status:       problem.Status,
 			Comment:      problem.Comment,
 			ProblemTypes: problem.ProblemTypes,
@@ -796,34 +884,32 @@ func (s *UserProblemService) ListUserGeneralComplaints(ctx context.Context, prob
 	}, nil
 }
 
-func (s *UserProblemService) CloseComplaint(ctx context.Context, problemID string, reason string) (*dto.CloseComplaintResponse, error) {
-	// Update complaint status
-	err := s.userProblemRepo.UpdateByProblemID(ctx, problemID, map[string]interface{}{
-		"status": "closed",
-		"reason": reason,
-	})
+func (s *UserProblemService) CloseComplaint(ctx context.Context, problemID string, reason, response string) (*dto.CloseComplaintResponse, error) {
+	_, err := s.userProblemRepo.FindByProblemID(ctx, problemID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find complaint: %w", err)
+	}
+
+	// $set creates "response" if absent in userProblem doc, or updates it if present
+	update := map[string]interface{}{
+		"status":   "closed",
+		"response": response,
+	}
+	// if reason != "" {
+	// 	update["reason"] = reason
+	// }
+
+	err = s.userProblemRepo.UpdateByProblemID(ctx, problemID, update)
 	if err != nil {
 		return nil, err
 	}
-
-	// Get user details for notification (if needed in future)
-	// problem, err := s.userProblemRepo.FindByProblemID(ctx, problemID)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// user, err := s.userRepo.FindByUserID(ctx, problem.UserID)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// Send notification (simplified)
-	// sendNotification(user.FCMToken, fmt.Sprintf("Your complaint has been closed by Admin. Reason: %s", reason))
 
 	return &dto.CloseComplaintResponse{
 		Success:   true,
 		Message:   "Complaint closed successfully",
 		ProblemID: problemID,
 		Status:    "closed",
+		Response:  response,
 	}, nil
 }
 
@@ -891,34 +977,24 @@ func (s *AstroProblemService) ListAstroGeneralComplaints(ctx context.Context, pr
 	}, nil
 }
 
-func (s *AstroProblemService) CloseComplaint(ctx context.Context, problemID string, reason string) (*dto.CloseComplaintResponse, error) {
-	// Update complaint status
-	err := s.astroProblemRepo.UpdateByProblemID(ctx, problemID, map[string]interface{}{
-		"status": "closed",
-		"reason": reason,
-	})
+func (s *AstroProblemService) CloseComplaint(ctx context.Context, problemID string, reason, response string) (*dto.CloseComplaintResponse, error) {
+	update := map[string]interface{}{
+		"status":   "closed",
+		"response": response,
+	}
+	if reason != "" {
+		update["reason"] = reason
+	}
+	err := s.astroProblemRepo.UpdateByProblemID(ctx, problemID, update)
 	if err != nil {
 		return nil, err
 	}
-
-	// Get astro details for notification (if needed in future)
-	// problem, err := s.astroProblemRepo.FindByProblemID(ctx, problemID)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// astro, err := s.astroRepo.FindByAstroID(ctx, problem.AstroID)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// Send notification (simplified)
-	// sendNotification(astro.FCMToken, fmt.Sprintf("Your complaint has been closed by Admin. Reason: %s", reason))
-
 	return &dto.CloseComplaintResponse{
 		Success:   true,
 		Message:   "Complaint closed successfully",
 		ProblemID: problemID,
 		Status:    "closed",
+		Response:  response,
 	}, nil
 }
 

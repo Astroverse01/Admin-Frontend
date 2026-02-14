@@ -45,7 +45,7 @@ func (r *userProblemRepository) FindAll(ctx context.Context, filter map[string]i
 
 func (r *userProblemRepository) FindByProblemID(ctx context.Context, problemID string) (*models.UserProblem, error) {
 	var problem models.UserProblem
-	err := r.collection.FindOne(ctx, bson.M{"problemId": problemID}).Decode(&problem)
+	err := r.collection.FindOne(ctx, bson.M{"problemtId": problemID}).Decode(&problem)
 	if err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (r *userProblemRepository) FindByProblemID(ctx context.Context, problemID s
 
 func (r *userProblemRepository) UpdateByProblemID(ctx context.Context, problemID string, update map[string]interface{}) error {
 	update["updatedAt"] = time.Now()
-	_, err := r.collection.UpdateOne(ctx, bson.M{"problemId": problemID}, bson.M{"$set": update})
+	_, err := r.collection.UpdateOne(ctx, bson.M{"problemtId": problemID}, bson.M{"$set": update})
 	return err
 }
 

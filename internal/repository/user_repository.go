@@ -62,7 +62,7 @@ func (r *userRepository) FindByUserID(ctx context.Context, userID string) (*mode
 }
 
 func (r *userRepository) UpdateByUserID(ctx context.Context, userID string, update map[string]interface{}) error {
-	update["updatedAt"] = time.Now()
+	update["updatedOn"] = time.Now()
 	_, err := r.collection.UpdateOne(ctx, bson.M{"userId": userID}, bson.M{"$set": update})
 	return err
 }

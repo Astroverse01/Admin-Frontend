@@ -77,3 +77,7 @@ type FeedbackRepository interface {
 	BulkCreate(ctx context.Context, feedbacks []*models.Feedback) error
 }
 
+// UserPaymentRepository defines the interface for userPayment collection (amount by userId)
+type UserPaymentRepository interface {
+	SumAmountsByUserIDs(ctx context.Context, userIDs []string) (map[string]float64, error)
+}

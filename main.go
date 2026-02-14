@@ -31,6 +31,7 @@ func main() {
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(mongoDB)
+	userPaymentRepo := repository.NewUserPaymentRepository(mongoDB)
 	astroRepo := repository.NewAstroRepository(mongoDB)
 	serviceReportRepo := repository.NewServiceReportRepository(mongoDB)
 	userProblemRepo := repository.NewUserProblemRepository(mongoDB)
@@ -50,11 +51,11 @@ func main() {
 
 	// Initialize services
 	authService := services.NewAuthService(cfg.JWTSecret)
-	userService := services.NewUserService(userRepo, decryptor)
+	userService := services.NewUserService(userRepo, userPaymentRepo, decryptor)
 	astroService := services.NewAstroService(astroRepo)
 	emailService := services.NewEmailService(cfg)
 	complaintService := services.NewComplaintService(serviceReportRepo, userRepo, astroRepo, mongoDB, emailService)
-	userProblemService := services.NewUserProblemService(userProblemRepo, userRepo)
+	userProblemService := services.NewUserProblemService(userProblemRepo, userRepo, decryptor)
 	astroProblemService := services.NewAstroProblemService(astroProblemRepo, astroRepo)
 	horoscopeService := services.NewHoroscopeService(horoscopeRepo)
 	schedulerService := services.NewSchedulerService(dailyReportRepo, cfg)
@@ -129,11 +130,11 @@ func main() {
 
 		// User general complaints
 		admin.GET("/user-general-complaints", userProblemHandler.ListUserGeneralComplaints)
-		admin.PATCH("/user-general-complaints/:problemId/close", userProblemHandler.CloseComplaint)
+		admin.PATCH("/user-general-complaints/:problemtId/close", userProblemHandler.CloseComplaint)
 
 		// Astro general complaints
 		admin.GET("/astro-general-complaints", astroProblemHandler.ListAstroGeneralComplaints)
-		admin.PATCH("/astro-general-complaints/:problemId/close", astroProblemHandler.CloseComplaint)
+		admin.PATCH("/astro-general-complaints/:problemtId/close", astroProblemHandler.CloseComplaint)
 
 		// Horoscope management
 		admin.GET("/horoscopes", horoscopeHandler.ListHoroscopes)

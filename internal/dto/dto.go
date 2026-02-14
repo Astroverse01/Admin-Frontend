@@ -26,6 +26,8 @@ type UserData struct {
 	Name        string `json:"name"`
 	Status      string `json:"status"`
 	PhoneNumber string `json:"phoneNumber,omitempty"` // decrypted phone number
+	UpdatedOn   string `json:"updatedOn,omitempty"`   // from user collection
+	Amount      string `json:"amount"`                // from userPayment collection; "" when not present for userId
 }
 
 // AstroListResponse represents the astro list response
@@ -115,9 +117,10 @@ type ProblemListResponse struct {
 
 // ProblemData represents problem data
 type ProblemData struct {
-	ProblemID    string `json:"problemId"`
+	ProblemID    string `json:"problemtId"`
 	UserID       string `json:"userId,omitempty"`
 	FullName     string `json:"fullName,omitempty"`
+	PhoneNumber  string `json:"phoneNumber"` // decrypted from user collection (phoneNo); empty string if not present
 	AstroID      string `json:"astroId,omitempty"`
 	Status       string `json:"status"`
 	Comment      string `json:"comment"`
@@ -126,7 +129,8 @@ type ProblemData struct {
 
 // CloseComplaintRequest represents close complaint request
 type CloseComplaintRequest struct {
-	Reason string `json:"reason" validate:"required"`
+	Reason   string `json:"reason,omitempty"`
+	Response string `json:"response" validate:"required"`
 }
 
 // CloseComplaintResponse represents close complaint response
@@ -135,6 +139,7 @@ type CloseComplaintResponse struct {
 	Message   string `json:"message"`
 	ProblemID string `json:"problemId"`
 	Status    string `json:"status"`
+	Response  string `json:"response"`
 }
 
 // HoroscopeListResponse represents horoscope list response

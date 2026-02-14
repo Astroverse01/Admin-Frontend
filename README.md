@@ -111,12 +111,12 @@ For the daily report scheduler to work, you need to:
 ### User General Complaints
 
 - `GET /admin/user-general-complaints` - List user general complaints
-- `PATCH /admin/user-general-complaints/:problemId/close` - Close a complaint
+- `PATCH /admin/user-general-complaints/:problemtId/close` - Close a complaint
 
 ### Astrologer General Complaints
 
 - `GET /admin/astro-general-complaints` - List astrologer general complaints
-- `PATCH /admin/astro-general-complaints/:problemId/close` - Close a complaint
+- `PATCH /admin/astro-general-complaints/:problemtId/close` - Close a complaint
 
 ### Horoscope Management
 

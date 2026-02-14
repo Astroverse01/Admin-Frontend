@@ -13,13 +13,14 @@ type User struct {
 	Name        string             `bson:"name,omitempty" json:"name"`
 	FullName    string             `bson:"fullName,omitempty" json:"-"`
 	Email       string             `bson:"email" json:"email"`
-	PhoneNo     string             `bson:"phoneNo,omitempty" json:"-"` // stored encrypted; use decrypted value in API
+	PhoneNo     string             `bson:"phoneNo,omitempty" json:"-"`     // stored encrypted (primary field name in collection)
+	PhoneNumber string             `bson:"phoneNumber,omitempty" json:"-"` // alternate name in some docs; use decrypted value in API
 	IsDeleted   int                `bson:"isDeleted" json:"isDeleted"`
 	TotalAmount float64            `bson:"totalAmount" json:"totalAmount"`
 	FCMToken    string             `bson:"fcmToken" json:"fcmToken"`
 	Platform    string             `bson:"platform" json:"platform"`
 	CreatedOn   time.Time          `bson:"createdOn" json:"createdOn"`
-	UpdatedAt   time.Time          `bson:"updatedAt" json:"updatedAt"`
+	UpdatedOn   time.Time          `bson:"updatedOn" json:"-"`
 }
 
 // Astrologer represents an astrologer in the system
@@ -58,12 +59,13 @@ type ServiceReport struct {
 // UserProblem represents a general user complaint
 type UserProblem struct {
 	ID           primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	ProblemID    string             `bson:"problemId" json:"problemId"`
+	ProblemID    string             `bson:"problemtId" json:"problemId"`
 	UserID       string             `bson:"userId" json:"userId"`
 	Status       string             `bson:"status" json:"status"`
 	Comment      string             `bson:"comment" json:"comment"`
 	ProblemTypes string             `bson:"problemTypes" json:"problemTypes"`
 	Reason       string             `bson:"reason" json:"reason"`
+	Response     string             `bson:"response" json:"response"`
 	CreatedOn    time.Time          `bson:"createdOn" json:"createdOn"`
 	UpdatedAt    time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
@@ -77,6 +79,7 @@ type AstroProblem struct {
 	Comment      string             `bson:"comment" json:"comment"`
 	ProblemTypes string             `bson:"problemTypes" json:"problemTypes"`
 	Reason       string             `bson:"reason" json:"reason"`
+	Response     string             `bson:"response" json:"response"`
 	CreatedOn    time.Time          `bson:"createdOn" json:"createdOn"`
 	UpdatedAt    time.Time          `bson:"updatedAt" json:"updatedAt"`
 }
@@ -151,4 +154,10 @@ type Feedback struct {
 	ProfilePic string             `bson:"profilePic" json:"profilePic"`
 	CreatedOn  time.Time          `bson:"createdOn" json:"createdOn"`
 	FeedbackID string             `bson:"feedbackId" json:"feedbackId"`
+}
+
+// UserPayment represents a payment record in userPayment collection (minimal for amount lookup)
+type UserPayment struct {
+	UserID string  `bson:"userId" json:"userId"`
+	Amount float64 `bson:"amount" json:"amount"`
 }

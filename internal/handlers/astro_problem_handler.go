@@ -49,7 +49,7 @@ func (h *AstroProblemHandler) ListAstroGeneralComplaints(c *gin.Context) {
 }
 
 func (h *AstroProblemHandler) CloseComplaint(c *gin.Context) {
-	problemID := c.Param("problemId")
+	problemID := c.Param("problemtId")
 	if problemID == "" {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Success: false,
@@ -78,7 +78,7 @@ func (h *AstroProblemHandler) CloseComplaint(c *gin.Context) {
 	}
 
 	// Call service
-	response, err := h.astroProblemService.CloseComplaint(c.Request.Context(), problemID, req.Reason)
+	response, err := h.astroProblemService.CloseComplaint(c.Request.Context(), problemID, req.Reason, req.Response)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Success: false,

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
@@ -30,6 +31,8 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 	if sort == "" {
 		sort = "asc"
 	}
+	updatedOnFrom := c.Query("updatedOnFrom") // optional, YYYY-MM-DD
+	updatedOnTo := c.Query("updatedOnTo")     // optional, YYYY-MM-DD
 
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page < 1 {
@@ -43,11 +46,31 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 		limit = 10
 	}
 
-	log.Printf("[ListUsers Handler] Query parameters - name: %s, sort: %s, page: %d, limit: %d", name, sort, page, limit)
+	// Validate updatedOn date format if provided
+	if updatedOnFrom != "" {
+		if _, err := time.Parse("2006-01-02", updatedOnFrom); err != nil {
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Success: false,
+				Message: "Invalid updatedOnFrom format. Use YYYY-MM-DD (e.g., 2025-01-15)",
+			})
+			return
+		}
+	}
+	if updatedOnTo != "" {
+		if _, err := time.Parse("2006-01-02", updatedOnTo); err != nil {
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+				Success: false,
+				Message: "Invalid updatedOnTo format. Use YYYY-MM-DD (e.g., 2025-01-15)",
+			})
+			return
+		}
+	}
+
+	log.Printf("[ListUsers Handler] Query parameters - name: %s, sort: %s, page: %d, limit: %d, updatedOnFrom: %s, updatedOnTo: %s", name, sort, page, limit, updatedOnFrom, updatedOnTo)
 
 	// Call service
 	log.Println("[ListUsers Handler] Calling userService.ListUsers")
-	response, err := h.userService.ListUsers(c.Request.Context(), name, sort, page, limit)
+	response, err := h.userService.ListUsers(c.Request.Context(), name, sort, page, limit, updatedOnFrom, updatedOnTo)
 	if err != nil {
 		log.Printf("[ListUsers Handler] Error from service: %v", err)
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
