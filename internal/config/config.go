@@ -17,6 +17,8 @@ type Config struct {
 	Salt       string
 	Iterations int
 	Keylen     int
+	S3Bucket   string
+	AWSRegion  string
 }
 
 func Load() *Config {
@@ -32,6 +34,11 @@ func Load() *Config {
 			keylen = i
 		}
 	}
+	s3Bucket := os.Getenv("AWS_S3_BUCKET")
+	if s3Bucket == "" {
+		s3Bucket = getEnv("S3_BUCKET_NAME", "")
+	}
+
 	return &Config{
 		MongoURI:   getEnv("MONGO_URI", "mongodb+srv://sapini8865:UFodVdiCQLsLELWI@cluster0.nrhp6.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"),
 		JWTSecret:  getEnv("JWT_SECRET", "your-secret-key"),
@@ -44,6 +51,8 @@ func Load() *Config {
 		Salt:       getEnv("SALT", "eb7ddfeab5349c80ab0290e03577f04f"),
 		Iterations: iterations,
 		Keylen:     keylen,
+		S3Bucket:   s3Bucket,
+		AWSRegion:  getEnv("AWS_REGION", ""),
 	}
 }
 

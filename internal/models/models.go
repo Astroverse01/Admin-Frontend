@@ -30,6 +30,7 @@ type Astrologer struct {
 	Name        string             `bson:"name,omitempty" json:"name"`
 	FullName    string             `bson:"fullName,omitempty" json:"-"`
 	Email       string             `bson:"email" json:"email"`
+	Status      string             `bson:"status" json:"status"`
 	IsDeleted   int                `bson:"isDeleted" json:"isDeleted"`
 	IsActive    int                `bson:"isActive" json:"isActive"`
 	Balance     float64            `bson:"balance" json:"balance"`
@@ -38,6 +39,15 @@ type Astrologer struct {
 	Platform    string             `bson:"platform" json:"platform"`
 	CreatedOn   time.Time          `bson:"createdOn" json:"createdOn"`
 	UpdatedAt   time.Time          `bson:"updatedAt" json:"updatedAt"`
+}
+
+// AstroPayment represents a payment record for an astrologer
+type AstroPayment struct {
+	ID               primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	AstroID          string             `bson:"astroId" json:"astroId"`
+	AstroName        string             `bson:"astroName" json:"astroName"`
+	AmountDisbursed  float64            `bson:"amountDisbursed" json:"amountDisbursed"`
+	CreatedOn        time.Time          `bson:"createdOn" json:"createdOn"`
 }
 
 // ServiceReport represents a service complaint
@@ -160,4 +170,33 @@ type Feedback struct {
 type UserPayment struct {
 	UserID string  `bson:"userId" json:"userId"`
 	Amount float64 `bson:"amount" json:"amount"`
+}
+
+// BlogContentType represents blog content type
+type BlogContentType string
+
+const (
+	BlogContentTypeMDX  BlogContentType = "mdx"
+	BlogContentTypeRich BlogContentType = "rich"
+)
+
+// Blog represents a blog post (collection: blogs)
+type Blog struct {
+	ID             primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	BlogID         string             `bson:"blogId" json:"blogId"`
+	Title          string             `bson:"title" json:"title"`
+	Slug           string             `bson:"slug" json:"slug"`
+	Excerpt        string             `bson:"excerpt,omitempty" json:"excerpt,omitempty"`
+	ContentType    BlogContentType    `bson:"contentType,omitempty" json:"contentType,omitempty"`
+	ReadingTimeMin int                `bson:"readingTimeMin,omitempty" json:"readingTimeMin,omitempty"`
+	ContentBody    string             `bson:"contentBody,omitempty" json:"contentBody,omitempty"`
+	IsFeatured     bool               `bson:"isFeatured,omitempty" json:"isFeatured,omitempty"`
+	Categories     []string           `bson:"categories,omitempty" json:"categories,omitempty"`
+	Tags           []string           `bson:"tags,omitempty" json:"tags,omitempty"`
+	CoverImage     string             `bson:"coverImage" json:"coverImage"`
+	Status         string             `bson:"status,omitempty" json:"status,omitempty"` // draft/published/archived (free-form for now)
+	SEOTitle       string             `bson:"seoTitle" json:"seoTitle"`
+	SEODescription string             `bson:"seoDescription" json:"seoDescription"`
+	CreatedOn      time.Time          `bson:"createdOn" json:"createdOn"`
+	UpdatedOn      time.Time          `bson:"updatedOn" json:"updatedOn"`
 }

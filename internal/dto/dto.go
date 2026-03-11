@@ -39,10 +39,11 @@ type AstroListResponse struct {
 
 // AstroData represents astro data in list response
 type AstroData struct {
-	AstroID string `json:"astroId"`
-	Name    string `json:"name"`
-	Status  string `json:"status"`
-	Visible string `json:"visible"`
+	AstroID     string `json:"astroId"`
+	Name        string `json:"name"`
+	Status      string `json:"status"`      // online/offline from astrologer collection
+	FinalStatus string `json:"finalStatus"` // active/inactive derived from isDeleted
+	Visible     string `json:"visible"`
 }
 
 // ComplaintListResponse represents complaint list response
@@ -214,9 +215,12 @@ type SuccessResponse struct {
 	Message string `json:"message"`
 }
 
-// StatusUpdateRequest represents status update request
+// StatusUpdateRequest represents astrologer status update request
+// finalStatus controls active/inactive; status (optional) controls online/offline.
 type StatusUpdateRequest struct {
-	Status string `json:"status" validate:"required,oneof=active inactive"`
+	FinalStatus          string  `json:"finalStatus" validate:"required,oneof=active inactive"`
+	Status               string  `json:"status,omitempty" validate:"omitempty,oneof=online offline"`
+	AstroAmountDisbursed float64 `json:"astroAmountDisbursed,omitempty"`
 }
 
 // VisibilityUpdateRequest represents visibility update request
@@ -226,9 +230,11 @@ type VisibilityUpdateRequest struct {
 
 // StatusUpdateResponse represents status update response
 type StatusUpdateResponse struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
-	ID      string `json:"id"`
+	Success     bool   `json:"success"`
+	Message     string `json:"message"`
+	ID          string `json:"id"`
+	FinalStatus string `json:"finalStatus"`
+	Status      string `json:"status,omitempty"`
 }
 
 // GenerateReportRequest represents date range request for report generation
@@ -295,4 +301,69 @@ type BulkFeedbackResponse struct {
 	Success    bool     `json:"success"`
 	Message    string   `json:"message"`
 	FeedbackID []string `json:"feedbackId"`
+}
+
+// -------- Blogs --------
+
+type CreateBlogRequest struct {
+	Title          string   `json:"title" form:"title" validate:"required"`
+	Slug           string   `json:"slug" form:"slug" validate:"required"`
+	Excerpt        string   `json:"excerpt,omitempty" form:"excerpt"`
+	ContentType    string   `json:"contentType,omitempty" form:"contentType" validate:"omitempty,oneof=mdx rich"`
+	ReadingTimeMin *int     `json:"readingTimeMin,omitempty" form:"readingTimeMin"` // required when contentType is provided
+	ContentBody    string   `json:"contentBody" form:"contentBody" validate:"required"`
+	IsFeatured     bool     `json:"isFeatured,omitempty" form:"isFeatured"`
+	Categories     []string `json:"categories,omitempty" form:"categories"`
+	Tags           []string `json:"tags,omitempty" form:"tags"`
+	CoverImage     string   `json:"coverImage" validate:"required"`
+	Status         string   `json:"status,omitempty" form:"status"`
+	SEOTitle       string   `json:"seoTitle" form:"seoTitle" validate:"required"`
+	SEODescription string   `json:"seoDescription" form:"seoDescription" validate:"required"`
+}
+
+type UpdateBlogRequest struct {
+	Title          *string   `json:"title,omitempty"`
+	Slug           *string   `json:"slug,omitempty"`
+	Excerpt        *string   `json:"excerpt,omitempty"`
+	ContentType    *string   `json:"contentType,omitempty" validate:"omitempty,oneof=mdx rich"`
+	ReadingTimeMin *int      `json:"readingTimeMin,omitempty"`
+	ContentBody    *string   `json:"contentBody" validate:"required"`
+	IsFeatured     *bool     `json:"isFeatured,omitempty"`
+	Categories     *[]string `json:"categories,omitempty"`
+	Tags           *[]string `json:"tags,omitempty"`
+	CoverImage     *string   `json:"coverImage,omitempty"`
+	Status         *string   `json:"status,omitempty"`
+	SEOTitle       *string   `json:"seoTitle,omitempty"`
+	SEODescription *string   `json:"seoDescription,omitempty"`
+}
+
+type BlogData struct {
+	BlogID         string   `json:"blogId"`
+	Title          string   `json:"title"`
+	Slug           string   `json:"slug"`
+	Excerpt        string   `json:"excerpt,omitempty"`
+	ContentType    string   `json:"contentType,omitempty"`
+	ReadingTimeMin int      `json:"readingTimeMin,omitempty"`
+	ContentBody    string   `json:"contentBody,omitempty"`
+	IsFeatured     bool     `json:"isFeatured,omitempty"`
+	Categories     []string `json:"categories,omitempty"`
+	Tags           []string `json:"tags,omitempty"`
+	CoverImage     string   `json:"coverImage"`
+	Status         string   `json:"status,omitempty"`
+	SEOTitle       string   `json:"seoTitle"`
+	SEODescription string   `json:"seoDescription"`
+	CreatedOn      string   `json:"createdOn,omitempty"`
+	UpdatedOn      string   `json:"updatedOn,omitempty"`
+}
+
+type BlogResponse struct {
+	Success bool     `json:"success"`
+	Message string   `json:"message,omitempty"`
+	Data    *BlogData `json:"data,omitempty"`
+}
+
+type BlogListResponse struct {
+	Success    bool       `json:"success"`
+	Data       []BlogData `json:"data"`
+	Pagination Pagination  `json:"pagination"`
 }

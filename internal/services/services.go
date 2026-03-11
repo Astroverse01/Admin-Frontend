@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -253,12 +254,14 @@ func (s *UserService) DeactivateUser(ctx context.Context, userID string, status 
 
 // AstroService handles astrologer management logic
 type AstroService struct {
-	astroRepo repository.AstroRepository
+	astroRepo          repository.AstroRepository
+	astroPaymentRepo   repository.AstroPaymentRepository
 }
 
-func NewAstroService(astroRepo repository.AstroRepository) *AstroService {
+func NewAstroService(astroRepo repository.AstroRepository, astroPaymentRepo repository.AstroPaymentRepository) *AstroService {
 	return &AstroService{
-		astroRepo: astroRepo,
+		astroRepo:        astroRepo,
+		astroPaymentRepo: astroPaymentRepo,
 	}
 }
 
@@ -291,9 +294,9 @@ func (s *AstroService) ListAstros(ctx context.Context, name string, sort string,
 	// Convert to DTO
 	var astroData []dto.AstroData
 	for _, astro := range astros {
-		status := "active"
+		finalStatus := "active"
 		if astro.IsDeleted == 1 {
-			status = "inactive"
+			finalStatus = "inactive"
 		}
 
 		visible := "hidden"
@@ -308,10 +311,11 @@ func (s *AstroService) ListAstros(ctx context.Context, name string, sort string,
 		}
 
 		astroData = append(astroData, dto.AstroData{
-			AstroID: astro.AstroID,
-			Name:    name,
-			Status:  status,
-			Visible: visible,
+			AstroID:     astro.AstroID,
+			Name:        name,
+			Status:      astro.Status,   // online/offline from collection
+			FinalStatus: finalStatus,    // active/inactive based on IsDeleted
+			Visible:     visible,
 		})
 	}
 
@@ -337,14 +341,16 @@ func (s *AstroService) ListAstros(ctx context.Context, name string, sort string,
 	}, nil
 }
 
-func (s *AstroService) UpdateAstroStatus(ctx context.Context, astroID string, status string) error {
+func (s *AstroService) UpdateAstroStatus(ctx context.Context, astroID string, finalStatus string, status string, astroAmountDisbursed float64) error {
 	var isDeleted, isActive int
-	if status == "inactive" {
-		// When deactivating: set isDeleted=1 and isActive=0 (status=inactive, visibility=hidden)
+
+	// finalStatus controls active/inactive flags
+	if finalStatus == "inactive" {
+		// Deactivate: mark deleted and not visible
 		isDeleted = 1
 		isActive = 0
 	} else {
-		// When activating: set isDeleted=0 and isActive=1 (status=active, visibility=visible)
+		// Activate: mark not deleted and visible
 		isDeleted = 0
 		isActive = 1
 	}
@@ -352,6 +358,42 @@ func (s *AstroService) UpdateAstroStatus(ctx context.Context, astroID string, st
 	update := map[string]interface{}{
 		"isDeleted": isDeleted,
 		"isActive":  isActive,
+	}
+
+	// status (online/offline) is optional
+	if status != "" {
+		update["status"] = status
+	}
+
+	// Handle astroAmountDisbursed > 0: adjust astrologer financials and create astroPayment record
+	if astroAmountDisbursed > 0 {
+		astro, err := s.astroRepo.FindByAstroID(ctx, astroID)
+		if err != nil {
+			return fmt.Errorf("failed to find astrologer for disbursement: %w", err)
+		}
+
+		name := astro.Name
+		if name == "" && astro.FullName != "" {
+			name = astro.FullName
+		}
+
+		// Assumption: both totalEarned and balance are reduced by the disbursed amount.
+		newTotalEarned := astro.TotalEarned - astroAmountDisbursed
+		newBalance := astro.Balance - astroAmountDisbursed
+
+		update["totalEarned"] = newTotalEarned
+		update["balance"] = newBalance
+
+		payment := &models.AstroPayment{
+			AstroID:         astro.AstroID,
+			AstroName:       name,
+			AmountDisbursed: astroAmountDisbursed,
+			CreatedOn:       time.Now(),
+		}
+
+		if err := s.astroPaymentRepo.Create(ctx, payment); err != nil {
+			return fmt.Errorf("failed to create astro payment record: %w", err)
+		}
 	}
 
 	return s.astroRepo.UpdateByAstroID(ctx, astroID, update)
@@ -1319,4 +1361,338 @@ func (s *FeedbackService) BulkCreateFeedbacks(ctx context.Context, payload dto.B
 		Message:    "Feedbacks created successfully",
 		FeedbackID: feedbackIDs,
 	}, nil
+}
+
+// BlogService handles blog CRUD logic
+type BlogService struct {
+	blogRepo  repository.BlogRepository
+	s3Service *S3Service
+}
+
+func NewBlogService(blogRepo repository.BlogRepository, s3Service *S3Service) *BlogService {
+	return &BlogService{blogRepo: blogRepo, s3Service: s3Service}
+}
+
+func (s *BlogService) CreateBlog(ctx context.Context, req *dto.CreateBlogRequest) (*dto.BlogResponse, error) {
+	title := strings.TrimSpace(req.Title)
+	slug := strings.ToLower(strings.TrimSpace(req.Slug))
+	coverImage := strings.TrimSpace(req.CoverImage)
+	seoTitle := strings.TrimSpace(req.SEOTitle)
+	seoDescription := strings.TrimSpace(req.SEODescription)
+	contentBody := strings.TrimSpace(req.ContentBody)
+
+	if title == "" || slug == "" || coverImage == "" || seoTitle == "" || seoDescription == "" || contentBody == "" {
+		return nil, fmt.Errorf("title, slug, contentBody, coverImage, seoTitle and seoDescription are required")
+	}
+
+	contentType := strings.TrimSpace(req.ContentType)
+	if contentType != "" {
+		if contentType != string(models.BlogContentTypeMDX) && contentType != string(models.BlogContentTypeRich) {
+			return nil, fmt.Errorf("contentType must be one of: mdx, rich")
+		}
+		if req.ReadingTimeMin == nil || *req.ReadingTimeMin <= 0 {
+			return nil, fmt.Errorf("readingTimeMin is required and must be > 0 when contentType is provided")
+		}
+	}
+
+	// Enforce unique slug
+	if existing, err := s.blogRepo.FindBySlug(ctx, slug); err == nil && existing != nil {
+		return nil, fmt.Errorf("slug already exists")
+	} else if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+		return nil, fmt.Errorf("failed checking slug uniqueness: %w", err)
+	}
+
+	blogUUID, err := uuid.NewV7()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate blogId: %w", err)
+	}
+
+	now := time.Now().UTC()
+	blog := &models.Blog{
+		BlogID:         blogUUID.String(),
+		Title:          title,
+		Slug:           slug,
+		Excerpt:        strings.TrimSpace(req.Excerpt),
+		ContentType:    models.BlogContentType(contentType),
+		ContentBody:    contentBody,
+		IsFeatured:     req.IsFeatured,
+		Categories:     req.Categories,
+		Tags:           req.Tags,
+		CoverImage:     coverImage,
+		Status:         strings.TrimSpace(req.Status),
+		SEOTitle:       seoTitle,
+		SEODescription: seoDescription,
+		CreatedOn:      now,
+		UpdatedOn:      now,
+	}
+	if req.ReadingTimeMin != nil {
+		blog.ReadingTimeMin = *req.ReadingTimeMin
+	}
+
+	if blog.Status == "" {
+		blog.Status = "draft"
+	}
+
+	if err := s.blogRepo.Create(ctx, blog); err != nil {
+		return nil, fmt.Errorf("failed to create blog: %w", err)
+	}
+
+	return &dto.BlogResponse{
+		Success: true,
+		Message: "Blog created successfully",
+		Data:    s.toBlogData(blog),
+	}, nil
+}
+
+func (s *BlogService) ListBlogs(ctx context.Context, q, status string, page, limit int) (*dto.BlogListResponse, error) {
+	filter := make(map[string]interface{})
+	q = strings.TrimSpace(q)
+	status = strings.TrimSpace(status)
+
+	if q != "" {
+		filter["$or"] = []bson.M{
+			{"title": bson.M{"$regex": regexp.QuoteMeta(q), "$options": "i"}},
+			{"slug": bson.M{"$regex": regexp.QuoteMeta(q), "$options": "i"}},
+		}
+	}
+	if status != "" {
+		filter["status"] = status
+	}
+
+	skip := int64((page - 1) * limit)
+	blogs, err := s.blogRepo.FindAll(ctx, filter, skip, int64(limit))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch blogs: %w", err)
+	}
+
+	total, err := s.blogRepo.Count(ctx, filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count blogs: %w", err)
+	}
+
+	items := make([]dto.BlogData, 0, len(blogs))
+	for _, b := range blogs {
+		blog := b
+		items = append(items, *s.toBlogData(&blog))
+	}
+
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+	return &dto.BlogListResponse{
+		Success: true,
+		Data:    items,
+		Pagination: dto.Pagination{
+			Page:       page,
+			Limit:      limit,
+			Total:      int(total),
+			TotalPages: totalPages,
+		},
+	}, nil
+}
+
+func (s *BlogService) GetBlog(ctx context.Context, blogID string) (*dto.BlogResponse, error) {
+	blog, err := s.blogRepo.FindByBlogID(ctx, blogID)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("blog not found")
+		}
+		return nil, fmt.Errorf("failed to fetch blog: %w", err)
+	}
+	return &dto.BlogResponse{
+		Success: true,
+		Data:    s.toBlogData(blog),
+	}, nil
+}
+
+func (s *BlogService) UpdateBlog(ctx context.Context, blogID string, req *dto.UpdateBlogRequest) (*dto.BlogResponse, error) {
+	existing, err := s.blogRepo.FindByBlogID(ctx, blogID)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("blog not found")
+		}
+		return nil, fmt.Errorf("failed to fetch blog: %w", err)
+	}
+
+	update := map[string]interface{}{}
+
+	if req.Title != nil {
+		v := strings.TrimSpace(*req.Title)
+		if v == "" {
+			return nil, fmt.Errorf("title cannot be empty")
+		}
+		update["title"] = v
+	}
+	if req.Slug != nil {
+		v := strings.ToLower(strings.TrimSpace(*req.Slug))
+		if v == "" {
+			return nil, fmt.Errorf("slug cannot be empty")
+		}
+		// Check uniqueness if changed
+		if v != existing.Slug {
+			if found, err := s.blogRepo.FindBySlug(ctx, v); err == nil && found != nil {
+				return nil, fmt.Errorf("slug already exists")
+			} else if err != nil && !errors.Is(err, mongo.ErrNoDocuments) {
+				return nil, fmt.Errorf("failed checking slug uniqueness: %w", err)
+			}
+		}
+		update["slug"] = v
+	}
+	if req.CoverImage != nil {
+		v := strings.TrimSpace(*req.CoverImage)
+		if v == "" {
+			return nil, fmt.Errorf("coverImage cannot be empty")
+		}
+		update["coverImage"] = v
+	}
+	if req.SEOTitle != nil {
+		v := strings.TrimSpace(*req.SEOTitle)
+		if v == "" {
+			return nil, fmt.Errorf("seoTitle cannot be empty")
+		}
+		update["seoTitle"] = v
+	}
+	if req.SEODescription != nil {
+		v := strings.TrimSpace(*req.SEODescription)
+		if v == "" {
+			return nil, fmt.Errorf("seoDescription cannot be empty")
+		}
+		update["seoDescription"] = v
+	}
+	if req.Excerpt != nil {
+		update["excerpt"] = strings.TrimSpace(*req.Excerpt)
+	}
+	if req.ContentBody != nil {
+		v := strings.TrimSpace(*req.ContentBody)
+		if v == "" {
+			return nil, fmt.Errorf("contentBody cannot be empty")
+		}
+		update["contentBody"] = v
+	}
+	if req.IsFeatured != nil {
+		update["isFeatured"] = *req.IsFeatured
+	}
+	if req.Categories != nil {
+		update["categories"] = *req.Categories
+	}
+	if req.Tags != nil {
+		update["tags"] = *req.Tags
+	}
+	if req.Status != nil {
+		update["status"] = strings.TrimSpace(*req.Status)
+	}
+
+	var nextContentType string
+	if req.ContentType != nil {
+		nextContentType = strings.TrimSpace(*req.ContentType)
+		if nextContentType != "" &&
+			nextContentType != string(models.BlogContentTypeMDX) &&
+			nextContentType != string(models.BlogContentTypeRich) {
+			return nil, fmt.Errorf("contentType must be one of: mdx, rich")
+		}
+		update["contentType"] = nextContentType
+	} else {
+		nextContentType = string(existing.ContentType)
+	}
+
+	if req.ReadingTimeMin != nil {
+		if *req.ReadingTimeMin <= 0 {
+			return nil, fmt.Errorf("readingTimeMin must be > 0")
+		}
+		update["readingTimeMin"] = *req.ReadingTimeMin
+	}
+
+	// Conditional rule: if contentType is set (now or already), readingTimeMin must be present (either already stored or in update)
+	if strings.TrimSpace(nextContentType) != "" {
+		nextReadingTime := existing.ReadingTimeMin
+		if req.ReadingTimeMin != nil {
+			nextReadingTime = *req.ReadingTimeMin
+		}
+		if nextReadingTime <= 0 {
+			return nil, fmt.Errorf("readingTimeMin is required and must be > 0 when contentType is provided")
+		}
+	}
+
+	if len(update) == 0 {
+		return &dto.BlogResponse{Success: true, Message: "No changes"}, nil
+	}
+
+	if err := s.blogRepo.UpdateByBlogID(ctx, blogID, update); err != nil {
+		return nil, fmt.Errorf("failed to update blog: %w", err)
+	}
+
+	updated, err := s.blogRepo.FindByBlogID(ctx, blogID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch updated blog: %w", err)
+	}
+
+	return &dto.BlogResponse{
+		Success: true,
+		Message: "Blog updated successfully",
+		Data:    s.toBlogData(updated),
+	}, nil
+}
+
+func (s *BlogService) DeleteBlog(ctx context.Context, blogID string) (*dto.BlogResponse, error) {
+	blog, err := s.blogRepo.FindByBlogID(ctx, blogID)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, fmt.Errorf("blog not found")
+		}
+		return nil, fmt.Errorf("failed to fetch blog: %w", err)
+	}
+
+	// Delete DB record first
+	if err := s.blogRepo.DeleteByBlogID(ctx, blogID); err != nil {
+		return nil, fmt.Errorf("failed to delete blog: %w", err)
+	}
+
+	// Best-effort delete from S3 using the coverImage URL/key
+	if s.s3Service != nil && strings.TrimSpace(blog.CoverImage) != "" {
+		if key := extractS3KeyFromURL(blog.CoverImage); key != "" {
+			_ = s.s3Service.Delete(ctx, key)
+		}
+	}
+
+	return &dto.BlogResponse{Success: true, Message: "Blog deleted successfully"}, nil
+}
+
+// extractS3KeyFromURL converts either a raw key or a full S3 URL to a key.
+func extractS3KeyFromURL(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if !strings.HasPrefix(value, "http://") && !strings.HasPrefix(value, "https://") {
+		return strings.TrimPrefix(value, "/")
+	}
+	u, err := url.Parse(value)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimPrefix(u.Path, "/")
+}
+
+func (s *BlogService) toBlogData(b *models.Blog) *dto.BlogData {
+	out := &dto.BlogData{
+		BlogID:         b.BlogID,
+		Title:          b.Title,
+		Slug:           b.Slug,
+		Excerpt:        b.Excerpt,
+		ContentType:    string(b.ContentType),
+		ReadingTimeMin: b.ReadingTimeMin,
+		ContentBody:    b.ContentBody,
+		IsFeatured:     b.IsFeatured,
+		Categories:     b.Categories,
+		Tags:           b.Tags,
+		CoverImage:     b.CoverImage,
+		Status:         b.Status,
+		SEOTitle:       b.SEOTitle,
+		SEODescription: b.SEODescription,
+	}
+	if !b.CreatedOn.IsZero() {
+		out.CreatedOn = b.CreatedOn.Format(time.RFC3339)
+	}
+	if !b.UpdatedOn.IsZero() {
+		out.UpdatedOn = b.UpdatedOn.Format(time.RFC3339)
+	}
+	return out
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"admin-be/internal/dto"
 	"admin-be/internal/services"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -70,6 +71,8 @@ func (h *AstroHandler) UpdateAstroStatus(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[UpdateAstroStatus] astroId=%s payload=%+v", astroID, req)
+
 	// Validate request
 	validate := validator.New()
 	if err := validate.Struct(req); err != nil {
@@ -81,7 +84,13 @@ func (h *AstroHandler) UpdateAstroStatus(c *gin.Context) {
 	}
 
 	// Call service
-	err := h.astroService.UpdateAstroStatus(c.Request.Context(), astroID, req.Status)
+	err := h.astroService.UpdateAstroStatus(
+		c.Request.Context(),
+		astroID,
+		req.FinalStatus,
+		req.Status,
+		req.AstroAmountDisbursed,
+	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Success: false,
@@ -91,9 +100,11 @@ func (h *AstroHandler) UpdateAstroStatus(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.StatusUpdateResponse{
-		Success: true,
-		Message: "Astrologer " + req.Status + "d successfully",
-		ID:      astroID,
+		Success:     true,
+		Message:     "Astrologer status updated successfully",
+		ID:          astroID,
+		FinalStatus: req.FinalStatus,
+		Status:      req.Status,
 	})
 }
 

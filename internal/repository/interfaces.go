@@ -81,3 +81,19 @@ type FeedbackRepository interface {
 type UserPaymentRepository interface {
 	SumAmountsByUserIDs(ctx context.Context, userIDs []string) (map[string]float64, error)
 }
+
+// AstroPaymentRepository defines the interface for astroPayment collection
+type AstroPaymentRepository interface {
+	Create(ctx context.Context, payment *models.AstroPayment) error
+}
+
+// BlogRepository defines the interface for blog CRUD operations
+type BlogRepository interface {
+	FindAll(ctx context.Context, filter map[string]interface{}, skip, limit int64) ([]models.Blog, error)
+	FindByBlogID(ctx context.Context, blogID string) (*models.Blog, error)
+	FindBySlug(ctx context.Context, slug string) (*models.Blog, error)
+	Create(ctx context.Context, blog *models.Blog) error
+	UpdateByBlogID(ctx context.Context, blogID string, update map[string]interface{}) error
+	DeleteByBlogID(ctx context.Context, blogID string) error
+	Count(ctx context.Context, filter map[string]interface{}) (int64, error)
+}

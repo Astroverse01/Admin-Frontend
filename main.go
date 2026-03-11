@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 
@@ -33,6 +34,7 @@ func main() {
 	userRepo := repository.NewUserRepository(mongoDB)
 	userPaymentRepo := repository.NewUserPaymentRepository(mongoDB)
 	astroRepo := repository.NewAstroRepository(mongoDB)
+	astroPaymentRepo := repository.NewAstroPaymentRepository(mongoDB)
 	serviceReportRepo := repository.NewServiceReportRepository(mongoDB)
 	userProblemRepo := repository.NewUserProblemRepository(mongoDB)
 	astroProblemRepo := repository.NewAstroProblemRepository(mongoDB)
@@ -40,6 +42,7 @@ func main() {
 	dailyReportRepo := repository.NewDailyReportRepository(mongoDB)
 	serviceRepo := repository.NewServiceRepository(mongoDB)
 	feedbackRepo := repository.NewFeedbackRepository(mongoDB)
+	blogRepo := repository.NewBlogRepository(mongoDB)
 
 	// Decryptor for user phoneNo (matches Node Encryptor: PBKDF2 + AES-256-CBC)
 	var decryptor *utils.Decryptor
@@ -52,7 +55,7 @@ func main() {
 	// Initialize services
 	authService := services.NewAuthService(cfg.JWTSecret)
 	userService := services.NewUserService(userRepo, userPaymentRepo, decryptor)
-	astroService := services.NewAstroService(astroRepo)
+	astroService := services.NewAstroService(astroRepo, astroPaymentRepo)
 	emailService := services.NewEmailService(cfg)
 	complaintService := services.NewComplaintService(serviceReportRepo, userRepo, astroRepo, mongoDB, emailService)
 	userProblemService := services.NewUserProblemService(userProblemRepo, userRepo, decryptor)
@@ -60,7 +63,19 @@ func main() {
 	horoscopeService := services.NewHoroscopeService(horoscopeRepo)
 	schedulerService := services.NewSchedulerService(dailyReportRepo, cfg)
 	dashboardService := services.NewDashboardService(serviceRepo, userRepo)
+	var s3Service *services.S3Service
+	if cfg.S3Bucket != "" && cfg.AWSRegion != "" {
+		if s3, err := services.NewS3Service(context.Background(), cfg.S3Bucket, cfg.AWSRegion); err != nil {
+			log.Printf("Warning: Could not initialize S3 service: %v. Blog cover uploads disabled.", err)
+		} else {
+			s3Service = s3
+		}
+	} else {
+		log.Printf("Warning: S3 not configured (S3_BUCKET_NAME/AWS_REGION missing). Blog cover uploads disabled.")
+	}
+
 	feedbackService := services.NewFeedbackService(feedbackRepo)
+	blogService := services.NewBlogService(blogRepo, s3Service)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -73,6 +88,7 @@ func main() {
 	schedulerHandler := handlers.NewSchedulerHandler(schedulerService)
 	dashboardHandler := handlers.NewDashboardHandler(dashboardService)
 	feedbackHandler := handlers.NewFeedbackHandler(feedbackService)
+	blogHandler := handlers.NewBlogHandler(blogService, s3Service)
 
 	// Setup router
 	router := gin.Default()
@@ -149,6 +165,14 @@ func main() {
 
 		// Feedback management
 		admin.POST("/feedbacks/bulk", feedbackHandler.BulkCreateFeedbacks)
+
+		// Blogs CRUD
+		admin.POST("/blogs/cover-image", blogHandler.UploadCoverImage)
+		admin.POST("/blogs", blogHandler.CreateBlog)
+		admin.GET("/blogs", blogHandler.ListBlogs)
+		admin.GET("/blogs/:blogId", blogHandler.GetBlog)
+		admin.PATCH("/blogs/:blogId", blogHandler.UpdateBlog)
+		admin.DELETE("/blogs/:blogId", blogHandler.DeleteBlog)
 	}
 
 	// Start daily report scheduler
