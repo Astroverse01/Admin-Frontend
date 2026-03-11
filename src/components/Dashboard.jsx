@@ -46,7 +46,7 @@ const Dashboard = () => {
           },
           astros: {
             total: astrosRes.pagination?.total || 0,
-            active: astrosRes.data?.filter((a) => a.status === 'active').length || 0,
+            active: astrosRes.data?.filter((a) => a.finalStatus === 'active').length || 0,
           },
           userServiceComplaints: complaintsRes.pagination?.total || 0,
           userGeneralComplaints: userProblemsRes.pagination?.total || 0,

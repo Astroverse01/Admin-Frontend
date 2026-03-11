@@ -9,6 +9,7 @@ import UserServiceComplaints from './components/UserServiceComplaints';
 import UserGeneralComplaints from './components/UserGeneralComplaints';
 import AstroGeneralComplaints from './components/AstroGeneralComplaints';
 import Horoscopes from './components/Horoscopes';
+import Blogs from './components/Blogs';
 import Feedbacks from './components/Feedbacks';
 import Scheduler from './components/Scheduler';
 
@@ -89,6 +90,16 @@ function App() {
               <PrivateRoute>
                 <Layout>
                   <Horoscopes />
+                </Layout>
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/blogs"
+            element={
+              <PrivateRoute>
+                <Layout>
+                  <Blogs />
                 </Layout>
               </PrivateRoute>
             }

@@ -6,9 +6,16 @@ const Astros = () => {
   const [astros, setAstros] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
-  const [filters, setFilters] = useState({ name: '', sort: 'asc' });
+  const [filters, setFilters] = useState({
+    name: '',
+    sort: 'asc',
+    status: '',
+    finalStatus: '',
+    visible: '',
+  });
   const [actionLoading, setActionLoading] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [astroAmountDisbursed, setAstroAmountDisbursed] = useState({});
 
   const fetchAstros = async () => {
     setLoading(true);
@@ -18,8 +25,30 @@ const Astros = () => {
         limit: pagination.limit,
         name: filters.name,
         sort: filters.sort,
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.finalStatus ? { finalStatus: filters.finalStatus } : {}),
+        ...(filters.visible ? { visible: filters.visible } : {}),
       });
-      setAstros(response.data || []);
+      let data = response.data || [];
+
+      // Frontend filtering to ensure dropdowns always work,
+      // even if backend ignores some query params.
+      if (filters.status) {
+        if (filters.status === 'online') {
+          data = data.filter((a) => a.status === 'online');
+        } else if (filters.status === 'offline') {
+          // Treat anything not strictly "online" as offline
+          data = data.filter((a) => a.status !== 'online');
+        }
+      }
+      if (filters.finalStatus) {
+        data = data.filter((a) => a.finalStatus === filters.finalStatus);
+      }
+      if (filters.visible) {
+        data = data.filter((a) => a.visible === filters.visible);
+      }
+
+      setAstros(data);
       setPagination(response.pagination || pagination);
     } catch (error) {
       console.error('Error fetching astros:', error);
@@ -32,11 +61,11 @@ const Astros = () => {
     fetchAstros();
   }, [pagination.page, pagination.limit, filters]);
 
-  const handleStatusUpdate = async (astroId, currentStatus) => {
-    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+  const handleStatusUpdate = async (astroId, currentFinalStatus, currentStatus) => {
+    const newFinalStatus = currentFinalStatus === 'active' ? 'inactive' : 'active';
     setActionLoading(`status-${astroId}`);
     try {
-      await astrosAPI.updateStatus(astroId, newStatus);
+      await astrosAPI.updateStatus(astroId, currentStatus, newFinalStatus);
       fetchAstros();
     } catch (error) {
       console.error('Error updating astro status:', error);
@@ -46,14 +75,52 @@ const Astros = () => {
     }
   };
 
+  const handleOnlineToggle = async (astroId, newStatus, currentFinalStatus) => {
+    setActionLoading(`online-${astroId}`);
+    try {
+      await astrosAPI.updateStatus(astroId, newStatus, currentFinalStatus);
+      fetchAstros();
+    } catch (error) {
+      console.error('Error updating online status:', error);
+      alert('Failed to update online status');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleVisibilityToggle = async (astroId, currentVisible) => {
     setActionLoading(`visibility-${astroId}`);
     try {
-      await astrosAPI.toggleVisibility(astroId, !currentVisible);
+      const newVisible = currentVisible === 'visible' ? 'hidden' : 'visible';
+      await astrosAPI.toggleVisibility(astroId, newVisible);
       fetchAstros();
     } catch (error) {
       console.error('Error updating visibility:', error);
       alert('Failed to update visibility');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDisbursedSubmit = async (astroId, currentStatus, currentFinalStatus) => {
+    const amount = astroAmountDisbursed[astroId];
+    if (amount === undefined || amount === null || amount === '') {
+      return;
+    }
+
+    setActionLoading(`disbursed-${astroId}`);
+    try {
+      await astrosAPI.updateStatus(astroId, currentStatus, currentFinalStatus, amount);
+      await fetchAstros();
+      // Clear the amount input for this astro so the placeholder is empty
+      setAstroAmountDisbursed((prev) => {
+        const next = { ...prev };
+        delete next[astroId];
+        return next;
+      });
+    } catch (error) {
+      console.error('Error updating astro amount disbursed:', error);
+      alert('Failed to update astro amount disbursed');
     } finally {
       setActionLoading(null);
     }
@@ -101,6 +168,36 @@ const Astros = () => {
           >
             <option value="asc">Sort: A-Z</option>
             <option value="desc">Sort: Z-A</option>
+          </select>
+          <select
+            value={filters.status}
+            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+            title="Filter by online/offline status"
+          >
+            <option value="">Status: All</option>
+            <option value="online">Online</option>
+            <option value="offline">Offline</option>
+          </select>
+          <select
+            value={filters.finalStatus}
+            onChange={(e) => setFilters({ ...filters, finalStatus: e.target.value })}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+            title="Filter by active/inactive"
+          >
+            <option value="">Final Status: All</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <select
+            value={filters.visible}
+            onChange={(e) => setFilters({ ...filters, visible: e.target.value })}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+            title="Filter by visibility"
+          >
+            <option value="">Visibility: All</option>
+            <option value="visible">Visible</option>
+            <option value="hidden">Hidden</option>
           </select>
           <select
             value={pagination.limit}
@@ -157,8 +254,14 @@ const Astros = () => {
                       Status
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Final Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Visibility
                     </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Amount Disbursed
+                </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
@@ -176,12 +279,23 @@ const Astros = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            astro.status === 'active'
+                            astro.status === 'online'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {astro.status || 'offline'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            astro.finalStatus === 'active'
                               ? 'bg-green-100 text-green-800'
                               : 'bg-red-100 text-red-800'
                           }`}
                         >
-                          {astro.status}
+                          {astro.finalStatus}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -195,17 +309,45 @@ const Astros = () => {
                           {astro.visible}
                         </span>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="number"
+                            className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                            placeholder="Amount"
+                            value={astroAmountDisbursed[astro.astroId] ?? ''}
+                            onChange={(e) =>
+                              setAstroAmountDisbursed((prev) => ({
+                                ...prev,
+                                [astro.astroId]: e.target.value,
+                              }))
+                            }
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleDisbursedSubmit(astro.astroId, astro.status, astro.finalStatus)}
+                            disabled={
+                              actionLoading === `disbursed-${astro.astroId}` ||
+                              !astroAmountDisbursed[astro.astroId]
+                            }
+                            className="px-3 py-1 text-xs bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Go
+                          </button>
+                        </div>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                        {/* Final status toggle (active / inactive) */}
                         <button
-                          onClick={() => handleStatusUpdate(astro.astroId, astro.status)}
+                          onClick={() => handleStatusUpdate(astro.astroId, astro.finalStatus, astro.status)}
                           disabled={actionLoading === `status-${astro.astroId}`}
-                          className={`flex items-center space-x-1 px-3 py-1 rounded-lg transition ${
-                            astro.status === 'active'
+                          className={`inline-flex items-center space-x-1 px-3 py-1 rounded-lg transition ${
+                            astro.finalStatus === 'active'
                               ? 'bg-red-100 text-red-700 hover:bg-red-200'
                               : 'bg-green-100 text-green-700 hover:bg-green-200'
                           } disabled:opacity-50`}
                         >
-                          {astro.status === 'active' ? (
+                          {astro.finalStatus === 'active' ? (
                             <>
                               <UserX className="w-4 h-4" />
                               <span>Deactivate</span>
@@ -217,10 +359,33 @@ const Astros = () => {
                             </>
                           )}
                         </button>
+
+                        {/* Online/offline toggle (status: online/offline) */}
                         <button
-                          onClick={() => handleVisibilityToggle(astro.astroId, astro.visible === 'visible')}
+                          onClick={() =>
+                            handleOnlineToggle(
+                              astro.astroId,
+                              astro.status === 'online' ? 'offline' : 'online',
+                              astro.finalStatus
+                            )
+                          }
+                          disabled={actionLoading === `online-${astro.astroId}`}
+                          className={`inline-flex items-center space-x-1 px-3 py-1 rounded-lg border transition ${
+                            astro.status === 'online'
+                              ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                              : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          } disabled:opacity-50`}
+                        >
+                          <span className="text-xs font-semibold">
+                            {astro.status === 'online' ? 'On' : 'Off'}
+                          </span>
+                        </button>
+
+                        {/* Visibility toggle */}
+                        <button
+                          onClick={() => handleVisibilityToggle(astro.astroId, astro.visible)}
                           disabled={actionLoading === `visibility-${astro.astroId}`}
-                          className={`flex items-center space-x-1 px-3 py-1 rounded-lg transition ${
+                          className={`inline-flex items-center space-x-1 px-3 py-1 rounded-lg transition ${
                             astro.visible === 'visible'
                               ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                               : 'bg-blue-100 text-blue-700 hover:bg-blue-200'

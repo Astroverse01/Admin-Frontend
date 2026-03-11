@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api-admin.astrosway.com';
-
+//'http://localhost:8082/'
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -61,8 +61,23 @@ export const astrosAPI = {
     const response = await api.get('/admin/astros', { params });
     return response.data;
   },
-  updateStatus: async (astroId, status) => {
-    const response = await api.patch(`/admin/astros/${astroId}/status`, { status });
+  updateStatus: async (astroId, status, finalStatus, astroAmountDisbursed) => {
+    const payload = {};
+
+    // Only send fields that are explicitly provided from the UI.
+    if (status !== undefined && status !== null && status !== '') {
+      payload.status = status;
+    }
+    if (finalStatus !== undefined && finalStatus !== null && finalStatus !== '') {
+      payload.finalStatus = finalStatus;
+    }
+    if (astroAmountDisbursed !== undefined && astroAmountDisbursed !== null && astroAmountDisbursed !== '') {
+      // Send as a number when possible; backend treats this as optional.
+      const numericAmount = Number(astroAmountDisbursed);
+      payload.astroAmountDisbursed = Number.isNaN(numericAmount) ? astroAmountDisbursed : numericAmount;
+    }
+
+    const response = await api.patch(`/admin/astros/${astroId}/status`, payload);
     return response.data;
   },
   toggleVisibility: async (astroId, visible) => {
@@ -133,6 +148,93 @@ export const horoscopesAPI = {
   },
   deleteHoroscope: async (horoscopeId) => {
     const response = await api.delete(`/admin/horoscopes/${horoscopeId}`);
+    return response.data;
+  },
+};
+
+// Blogs API
+export const blogsAPI = {
+  listBlogs: async (params = {}) => {
+    const response = await api.get('/admin/blogs', { params });
+    return response.data;
+  },
+  getBlog: async (blogId) => {
+    const response = await api.get(`/admin/blogs/${blogId}`);
+    return response.data;
+  },
+  createBlog: async (data) => {
+    const formData = new FormData();
+
+    if (data.title) formData.append('title', data.title);
+    if (data.slug) formData.append('slug', data.slug);
+    if (data.status) formData.append('status', data.status);
+    if (data.seoTitle) formData.append('seoTitle', data.seoTitle);
+    if (data.seoDescription) formData.append('seoDescription', data.seoDescription);
+    if (data.contentType) formData.append('contentType', data.contentType);
+
+    // Backend expects "contentBody" field (per curl/Postman example)
+    if (data.contentBody) {
+      formData.append('contentBody', data.contentBody);
+    } else if (data.content) {
+      // Fallback if existing UI still uses "content"
+      formData.append('contentBody', data.content);
+    }
+
+    // Optional metadata fields used by backend
+    if (data.excerpt) formData.append('excerpt', data.excerpt);
+
+    if (data.isFeatured !== undefined && data.isFeatured !== null && data.isFeatured !== '') {
+      formData.append('isFeatured', String(data.isFeatured));
+    }
+
+    if (data.categories) {
+      // Backend curl example uses plain string "Astrology"
+      formData.append('categories', Array.isArray(data.categories) ? data.categories.join(',') : data.categories);
+    }
+
+    if (data.tags) {
+      formData.append('tags', Array.isArray(data.tags) ? data.tags.join(',') : data.tags);
+    }
+
+    if (data.readingTimeMin !== undefined && data.readingTimeMin !== null && data.readingTimeMin !== '') {
+      formData.append('readingTimeMin', data.readingTimeMin);
+    }
+    if (data.coverImage) {
+      formData.append('coverImage', data.coverImage);
+    }
+
+    const response = await api.post('/admin/blogs', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  updateBlog: async (blogId, data) => {
+    const payload = {};
+
+    if (data.title !== undefined) payload.title = data.title;
+    if (data.slug !== undefined) payload.slug = data.slug;
+    if (data.status !== undefined) payload.status = data.status;
+    if (data.contentType !== undefined) payload.contentType = data.contentType;
+    // Backend expects "contentBody" (align with createBlog and curl example)
+    if (data.contentBody !== undefined) {
+      payload.contentBody = data.contentBody;
+    } else if (data.content !== undefined) {
+      // Backwards compatibility if callers still use "content"
+      payload.contentBody = data.content;
+    }
+    if (data.seoTitle !== undefined) payload.seoTitle = data.seoTitle;
+    if (data.seoDescription !== undefined) payload.seoDescription = data.seoDescription;
+    if (data.readingTimeMin !== undefined && data.readingTimeMin !== null && data.readingTimeMin !== '') {
+      payload.readingTimeMin = data.readingTimeMin;
+    }
+
+    const response = await api.patch(`/admin/blogs/${blogId}`, payload);
+    return response.data;
+  },
+  deleteBlog: async (blogId) => {
+    const response = await api.delete(`/admin/blogs/${blogId}`);
     return response.data;
   },
 };
